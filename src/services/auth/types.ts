@@ -4,11 +4,12 @@ export interface LoginCredentials {
 }
 
 export interface UsuarioData {
-  id: string;
+  id: number;
   nome: string;
   email: string;
-  xp: number;
-  ofensivaDias: number;
+  tipo: string; // 'ALUNO' ou 'PROFESSOR'
+  xp?: number;
+  ofensivaDias?: number;
 }
 
 export interface AuthResponse {

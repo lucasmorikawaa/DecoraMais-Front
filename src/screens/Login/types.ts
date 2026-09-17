@@ -1,5 +1,7 @@
+import { UsuarioData } from '../../services/auth/types';
+
 export interface LoginScreenProps {
-  onLoginSuccess?: () => void;
+  onLoginSuccess?: (usuario: UsuarioData) => void;
   onNavigateToRegister?: () => void;
   onNavigateToForgotPassword?: () => void;
 }

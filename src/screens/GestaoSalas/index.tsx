@@ -1,54 +1,70 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
-import { BotaoCriarSala } from '../../components/Button/BotaoCriarSala/BotaoCriarSala';
-import { CardSala } from '../../components/CardSala/CardSala';
-import { ModalCriarSala } from '../../components/Modal/ModalCriarSala/ModalCriarSala';
-import { CardSalaProps } from '../../components/CardSala/types';
-import { styles } from './styles';
-
-// Tipo que inclui o 'id' único para o FlatList
-interface SalaData extends CardSalaProps {
-  id: string;
-}
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { BotaoCriarSala } from "../../components/Button/BotaoCriarSala/BotaoCriarSala";
+import { CardSala } from "../../components/CardSala/CardSala";
+import { ModalCriarSala } from "../../components/Modal/ModalCriarSala/ModalCriarSala";
+import { salaService } from "../../services/sala";
+import { SalaDTO } from "../../services/sala/types";
+import { styles } from "./styles";
 
 export function GestaoSalas() {
   const [modalVisible, setModalVisible] = useState(false);
-  
-  // Estado que armazena a lista de cards de salas
-  const [salas, setSalas] = useState<SalaData[]>([]);
+  const [salas, setSalas] = useState<SalaDTO[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Função auxiliar para gerar um código de convite aleatório (ex: DEC-8A92)
-  const gerarCodigoConvite = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 4; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+  // Busca as salas no Spring Boot ao montar o componente
+  const carregarSalas = async () => {
+    try {
+      setLoading(true);
+      const data = await salaService.listarSalas();
+      setSalas(data);
+    } catch (error: any) {
+      Alert.alert(
+        "Erro ao carregar",
+        error.response?.data?.message || "Não foi possível carregar as salas.",
+      );
+    } finally {
+      setLoading(false);
     }
-    return `DEC-${code}`;
   };
 
-  const handleCriarSala = (novosDados: { nome: string; disciplina: string; anoLetivo: string }) => {
-    const novaSala: SalaData = {
-      id: String(Date.now()), // ID único baseado no timestamp
-      periodo: novosDados.nome,
-      materia: novosDados.disciplina,
-      ano: novosDados.anoLetivo,
-      numAlunos: 0, // Inicia com 0 alunos por padrão
-      codigoConvite: gerarCodigoConvite(),
-    };
+  useEffect(() => {
+    carregarSalas();
+  }, []);
 
-    // Adiciona a nova sala no topo da lista
-    setSalas((prevSalas) => [novaSala, ...prevSalas]);
+  // Envia os dados para a API e adiciona na lista após resposta 201 Created
+  const handleCriarSala = async (novosDados: {
+    nome: string;
+    disciplina: string;
+    anoLetivo: string;
+  }) => {
+    try {
+      const salaCriada = await salaService.criarSala({
+        nome: novosDados.nome,
+        disciplina: novosDados.disciplina,
+        anoLetivo: novosDados.anoLetivo,
+      });
+
+      // Atualiza a lista localmente adicionando a resposta oficial da API no topo
+      setSalas((prevSalas) => [salaCriada, ...prevSalas]);
+      setModalVisible(false);
+      Alert.alert("Sucesso", "Sala criada com sucesso!");
+    } catch (error: any) {
+      Alert.alert(
+        "Erro ao criar sala",
+        error.response?.data?.message || "Falha ao conectar com o servidor.",
+      );
+    }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity>
-          <Text style={{ fontSize: 30 }}>☰</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.titleSection}>
         <Text style={styles.title}>Gestão de Salas</Text>
         <Text style={styles.subtitle}>Gerencie suas turmas e disciplinas</Text>
@@ -56,30 +72,39 @@ export function GestaoSalas() {
 
       <BotaoCriarSala onPress={() => setModalVisible(true)} />
 
-      {/* Lista de Cards Dinâmicos */}
-      <FlatList
-        data={salas}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <CardSala
-            periodo={item.periodo}
-            ano={item.ano}
-            materia={item.materia}
-            numAlunos={item.numAlunos}
-            codigoConvite={item.codigoConvite} id={''}          />
-        )}
-        contentContainerStyle={{ paddingBottom: 30, paddingTop: 10 }}
-        ListEmptyComponent={() => (
-          <View style={{ alignItems: 'center', marginTop: 40 }}>
-            <Text style={{ color: '#868E96', fontSize: 14 }}>
-              Nenhuma sala cadastrada ainda.
-            </Text>
-            <Text style={{ color: '#ADB5BD', fontSize: 12, marginTop: 4 }}>
-              Clique em "+ Criar Sala" para adicionar.
-            </Text>
-          </View>
-        )}
-      />
+      {loading ? (
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator size="large" color="#155DFC" />
+        </View>
+      ) : (
+        <FlatList
+          data={salas}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <CardSala
+              id={item.id}
+              periodo={item.nome}
+              materia={item.disciplina}
+              ano={item.anoLetivo}
+              numAlunos={item.numAlunos}
+              codigoConvite={item.codigoConvite}
+            />
+          )}
+          contentContainerStyle={{ paddingBottom: 30, paddingTop: 10 }}
+          ListEmptyComponent={() => (
+            <View style={{ alignItems: "center", marginTop: 40 }}>
+              <Text style={{ color: "#868E96", fontSize: 14 }}>
+                Nenhuma sala cadastrada ainda.
+              </Text>
+              <Text style={{ color: "#ADB5BD", fontSize: 12, marginTop: 4 }}>
+                Clique em "+ Criar Sala" para adicionar.
+              </Text>
+            </View>
+          )}
+        />
+      )}
 
       <ModalCriarSala
         visible={modalVisible}

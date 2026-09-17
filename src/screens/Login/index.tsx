@@ -11,6 +11,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authService } from '../../services/auth';
 import { styles } from './styles';
 import { LoginScreenProps } from './types';
 
@@ -18,14 +20,16 @@ export function LoginScreen({
   onLoginSuccess,
   onNavigateToRegister,
   onNavigateToForgotPassword,
-}: LoginScreenProps) {
+  navigation, // Caso esteja utilizando o React Navigation
+}: LoginScreenProps & { navigation?: any }) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    // 1. Validação local básica de campos vazios
     if (!email.trim() || !senha.trim()) {
       setErro('Por favor, preencha o e-mail e a senha.');
       return;
@@ -34,16 +38,37 @@ export function LoginScreen({
     setErro('');
     setLoading(true);
 
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      // 2. Chamada HTTP real para a API Spring Boot
+      const response = await authService.login({
+        email: email.trim(),
+        senha: senha.trim(),
+      });
 
-      if (email.includes('@')) {
-        Alert.alert('Sucesso', 'Login realizado com sucesso!');
-        if (onLoginSuccess) onLoginSuccess();
+      // 3. Salva o Token JWT e os Dados do Usuário no dispositivo
+      await AsyncStorage.setItem('@DecoraPlus:token', response.token);
+      await AsyncStorage.setItem('@DecoraPlus:user', JSON.stringify(response.usuario));
+
+      // 4. Avisa o componente pai (App.js) quem logou.
+      // É o App.js quem decide para qual tela ir com base em usuario.tipo.
+      onLoginSuccess?.(response.usuario);
+
+    } catch (error: any) {
+      // 5. Captura erros reais retornados pelo Spring Boot (Status 401, 403 ou indisponibilidade)
+      if (error.response) {
+        if (error.response.status === 401) {
+          setErro('E-mail ou senha inválidos.');
+        } else {
+          setErro(error.response.data?.message || 'Erro ao realizar login.');
+        }
+      } else if (error.request) {
+        setErro('Não foi possível conectar ao servidor. Verifique seu IP/Backend.');
       } else {
-        setErro('Insira um endereço de e-mail válido.');
+        setErro('Ocorreu um erro inesperado.');
       }
-    }, 1500);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -111,7 +136,6 @@ export function LoginScreen({
             )}
           </TouchableOpacity>
         </View>
-
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Não tem uma conta?</Text>

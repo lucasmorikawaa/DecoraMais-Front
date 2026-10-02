@@ -13,4 +13,20 @@ export const salaService = {
     const response = await api.post<SalaDTO>('/salas', payload);
     return response.data;
   },
+
+  buscarSalaPorCodigo: async (codigo: string): Promise<SalaDTO> => {
+    const response = await api.get<SalaDTO>(
+    `/salas/convite/${codigo}`
+    );
+
+    return response.data;
+  },
+
+  ingressarNaSala: async (codigo: string): Promise<void> => {
+    await api.post('/salas/ingressar', null, {
+      params: {
+        codigo,
+      },
+    });
+  },
 };

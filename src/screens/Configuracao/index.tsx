@@ -13,6 +13,12 @@ import { api } from "../../services/api";
 import { SettingsCard } from "../../components/ConfiguracaoCard/ConfiguracaoCard";
 import { styles } from "./styles";
 
+// O backend retorna erros como { status, mensagem } (em português).
+// Essa função pega a mensagem certa, com um texto padrão caso não exista.
+function extrairMensagemErro(error: any, padrao: string): string {
+  return error.response?.data?.mensagem || padrao;
+}
+
 export function Configuracoes() {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -34,16 +40,20 @@ export function Configuracoes() {
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
+  const [alterandoSenha, setAlterandoSenha] = useState(false);
 
   // 1. Busca os dados do usuário do Back-end Spring Boot
   const carregarPerfil = async () => {
     try {
       setLoading(true);
 
-      const response = await api.get("/auth/me");
+      const response = await api.get("/usuarios/me");
       const perfil = {
         nome: response.data.nome || "",
         email: response.data.email || "",
+        // OBS: "instituicao" não existe no back-end (UsuarioResponseDTO só tem
+        // id/nome/email/tipo). Por isso sempre volta vazio e cai no "Fatec" aqui.
+        // Esse campo hoje é só visual, não é salvo de verdade no servidor.
         instituicao: response.data.instituicao || "Fatec",
       };
 
@@ -55,8 +65,7 @@ export function Configuracoes() {
     } catch (error: any) {
       Alert.alert(
         "Erro ao carregar",
-        error.response?.data?.message ||
-          "Não foi possível carregar as informações do usuário."
+        extrairMensagemErro(error, "Não foi possível carregar as informações do usuário.")
       );
     } finally {
       setLoading(false);
@@ -67,14 +76,20 @@ export function Configuracoes() {
     carregarPerfil();
   }, []);
 
-  // 2. Envia os dados atualizados para a API (PUT/PATCH)
+  // 2. Envia os dados atualizados para a API (nome/e-mail)
   const handleSalvarPerfil = async () => {
+    if (!nome.trim() || !email.trim()) {
+      Alert.alert("Campos obrigatórios", "Preencha nome e e-mail.");
+      return;
+    }
+
     try {
       setSalvando(true);
 
       await api.put("/usuarios/me", {
         nome,
         email,
+        // instituicao é enviada mas o back-end ignora esse campo (não existe lá ainda)
         instituicao,
       });
 
@@ -85,8 +100,7 @@ export function Configuracoes() {
     } catch (error: any) {
       Alert.alert(
         "Erro ao salvar",
-        error.response?.data?.message ||
-          "Falha ao atualizar o perfil no servidor."
+        extrairMensagemErro(error, "Falha ao atualizar o perfil no servidor.")
       );
     } finally {
       setSalvando(false);
@@ -99,6 +113,46 @@ export function Configuracoes() {
     setEmail(dadosOriginais.email);
     setInstituicao(dadosOriginais.instituicao);
     setEditandoPerfil(false);
+  };
+
+  // 3. Troca a senha do usuário (exige a senha atual)
+  const handleAlterarSenha = async () => {
+    if (!senhaAtual || !novaSenha || !confirmarSenha) {
+      Alert.alert("Campos obrigatórios", "Preencha a senha atual, a nova senha e a confirmação.");
+      return;
+    }
+
+    if (novaSenha.length < 6) {
+      Alert.alert("Senha muito curta", "A nova senha deve ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (novaSenha !== confirmarSenha) {
+      Alert.alert("Senhas não conferem", "A nova senha e a confirmação precisam ser iguais.");
+      return;
+    }
+
+    try {
+      setAlterandoSenha(true);
+
+      await api.put("/usuarios/senha", {
+        senhaAtual,
+        novaSenha,
+      });
+
+      Alert.alert("Sucesso", "Sua senha foi alterada.");
+      setSenhaAtual("");
+      setNovaSenha("");
+      setConfirmarSenha("");
+    } catch (error: any) {
+      // Ex: "Senha atual incorreta." vem direto do backend
+      Alert.alert(
+        "Erro ao alterar senha",
+        extrairMensagemErro(error, "Não foi possível alterar a senha.")
+      );
+    } finally {
+      setAlterandoSenha(false);
+    }
   };
 
   if (loading) {
@@ -145,6 +199,7 @@ export function Configuracoes() {
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
+            autoCapitalize="none"
             editable={editandoPerfil}
           />
 
@@ -236,8 +291,17 @@ export function Configuracoes() {
             secureTextEntry
           />
 
-          <TouchableOpacity style={styles.buttonSecondary} activeOpacity={0.8}>
-            <Text style={styles.buttonSecondaryText}>Alterar senha</Text>
+          <TouchableOpacity
+            style={[styles.buttonSecondary, alterandoSenha && { opacity: 0.6 }]}
+            activeOpacity={0.8}
+            onPress={handleAlterarSenha}
+            disabled={alterandoSenha}
+          >
+            {alterandoSenha ? (
+              <ActivityIndicator size="small" color="#000000" />
+            ) : (
+              <Text style={styles.buttonSecondaryText}>Alterar senha</Text>
+            )}
           </TouchableOpacity>
         </SettingsCard>
       </ScrollView>

@@ -6,7 +6,7 @@ import { CardInsigniaGrid } from '../../components/CardInsigniaGrid/CardInsignia
 import { styles } from './styles';
 import { InsigniaItem, LojaInsigniasScreenProps } from './types';
 
-export function LojaInsigniasScreen({
+export function LojaInsignias({
   usuarioXp = 850,
   onGoBack,
 }: LojaInsigniasScreenProps) {

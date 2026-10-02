@@ -35,7 +35,7 @@ export function DrawerRoutes() {
         drawerLabelStyle: {
           fontSize: 15,
           fontWeight: '500',
-          marginLeft: -16, // Ajusta o espaçamento entre o ícone e o texto
+          marginLeft: 12, // Ajusta o espaçamento entre o ícone e o texto
         },
       }}
     >

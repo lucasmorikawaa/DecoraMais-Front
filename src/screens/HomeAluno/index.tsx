@@ -1,18 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CardMateria } from '../../components/CardMateria/CardMateria';
+import { SecaoIngressarSala } from '../../components/SecaoIngressarSala'; // Ajuste o caminho da importação
+import { api } from '../../services/api'; 
 import { styles } from './styles';
 
 export function HomeAluno() {
-  const [codigoSala, setCodigoSala] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [nomeUsuario, setNomeUsuario] = useState('');
+  const [streak, setStreak] = useState(0);
+  const [xp, setXp] = useState(0);
 
   // Lista mockada de matérias para renderização
   const materias = [
@@ -42,32 +47,55 @@ export function HomeAluno() {
     },
   ];
 
-  const handleEntrarSala = () => {
-    if (!codigoSala.trim()) {
-      Alert.alert('Código necessário', 'Digite o código da sala para entrar.');
-      return;
+  // Busca as informações do aluno autenticado no Spring Boot
+  const carregarDadosAluno = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/usuarios/me');
+      
+      setNomeUsuario(response.data.nome || 'Aluno');
+      setStreak(response.data.ofensiva || response.data.streak || 0); 
+      setXp(response.data.xp || 0);
+    } catch (error: any) {
+      console.log('Erro ao carregar dados do aluno:', error);
+      Alert.alert(
+        'Erro',
+        error.response?.data?.message || 'Não foi possível carregar as informações do perfil.'
+      );
+    } finally {
+      setLoading(false);
     }
-    Alert.alert('Sucesso', `Ingressando na sala: ${codigoSala}`);
-    setCodigoSala('');
   };
+
+  useEffect(() => {
+    carregarDadosAluno();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#155DFC" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Topo / Header com XP e Ofensiva */}
+        {/* Topo / Header com XP e Ofensiva dinâmicos */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Olá, Fulano da Silva!</Text>
+            <Text style={styles.greeting}>Olá, {nomeUsuario}!</Text>
             <View style={styles.xpBadge}>
-              <Text style={styles.xpText}>850 XP</Text>
+              <Text style={styles.xpText}>{xp} XP</Text>
             </View>
           </View>
 
           <View style={styles.streakContainer}>
             <MaterialCommunityIcons name="fire" size={32} color="#FF6B00" />
             <View>
-              <Text style={styles.streakText}>12</Text>
+              <Text style={styles.streakText}>{streak}</Text>
               <Text style={styles.streakSubtext}>Dias</Text>
             </View>
           </View>
@@ -95,25 +123,8 @@ export function HomeAluno() {
           <Text style={styles.seeMoreText}>Ver todas matérias</Text>
         </TouchableOpacity>
 
-        {/* Seção de Entrar na Sala */}
-        <Text style={styles.sectionTitle}>Ingressar em uma sala</Text>
-        <Text style={styles.sectionSubtitle}>
-          Entre em uma sala para receber seus flashcards
-        </Text>
-
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="Coloque o código da sala aqui..."
-            placeholderTextColor="#ADB5BD"
-            value={codigoSala}
-            onChangeText={setCodigoSala}
-            autoCapitalize="characters"
-          />
-          <TouchableOpacity style={styles.enterButton} onPress={handleEntrarSala}>
-            <Text style={styles.enterButtonText}>ENTRAR</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Componente Modular de Ingressar em Sala */}
+        <SecaoIngressarSala />
 
       </ScrollView>
     </View>

@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-gesture-handler';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import "react-native-gesture-handler";
+import { NavigationContainer } from "@react-navigation/native";
 
-import { DrawerRoutes } from './src/navigation/DrawerRoutes';
-import { LoginScreen } from './src/screens/Login';
-import { HomeAluno } from './src/screens/HomeAluno';
+import { DrawerRoutes } from "./src/navigation/DrawerRoutes";
+import { LoginScreen } from "./src/screens/Login";
+import { HomeAluno } from "./src/screens/HomeAluno";
+import { AlunoRoutes } from "./src/navigation/AlunoRoutes";
 
 export default function App() {
   // Guarda o usuário logado (id, nome, email, tipo, ...).
@@ -16,14 +17,12 @@ export default function App() {
   // O LoginScreen chama isso passando os dados do usuário assim que o login der certo.
   if (!usuarioLogado) {
     return (
-      <LoginScreen
-        onLoginSuccess={(usuario) => setUsuarioLogado(usuario)}
-      />
+      <LoginScreen onLoginSuccess={(usuario) => setUsuarioLogado(usuario)} />
     );
   }
 
   // Logou como PROFESSOR -> vai para o Drawer de Gestão de Salas.
-  if (usuarioLogado.tipo === 'PROFESSOR') {
+  if (usuarioLogado.tipo === "PROFESSOR") {
     return (
       <NavigationContainer>
         <StatusBar style="auto" />
@@ -34,9 +33,9 @@ export default function App() {
 
   // Logou como ALUNO -> vai para a Home do Aluno.
   return (
-    <>
+    <NavigationContainer>
       <StatusBar style="auto" />
-      <HomeAluno />
-    </>
+      <AlunoRoutes />
+    </NavigationContainer>
   );
 }

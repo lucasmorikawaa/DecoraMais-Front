@@ -5,92 +5,126 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
   StyleSheet,
-  Alert
 } from 'react-native';
+import { salaService } from '../../../services/sala';
+import { SalaDTO } from '../../../services/sala/types';
 
 interface ModalCriarSalaProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (dados: { nome: string; disciplina: string; anoLetivo: string }) => void;
+  onSalaCriada: (novaSala: SalaDTO) => void;
 }
 
-export function ModalCriarSala({ visible, onClose, onSubmit }: ModalCriarSalaProps) {
+export function ModalCriarSala({ visible, onClose, onSalaCriada }: ModalCriarSalaProps) {
   const [nome, setNome] = useState('');
   const [disciplina, setDisciplina] = useState('');
-  const [anoLetivo, setAnoLetivo] = useState('');
-  const [erro, setErro] = useState('');
+  const [ano, setAno] = useState('');
+  const [criando, setCriando] = useState(false);
 
-  const handleSubmit = () => {
-    // Validação de todos os campos obrigatórios
-    if (!nome.trim() || !disciplina.trim() || !anoLetivo.trim()) {
-      setErro('Por favor, preencha todos os campos obrigatórios.');
+  const limparCampos = () => {
+    setNome('');
+    setDisciplina('');
+    setAno('');
+  };
+
+  const handleCriar = async () => {
+    if (!nome.trim() || !disciplina.trim() || !ano.trim()) {
+      Alert.alert('Campos obrigatórios', 'Preencha nome, disciplina e ano.');
       return;
     }
 
-    setErro('');
-    onSubmit({
-      nome: nome.trim(),
-      disciplina: disciplina.trim(),
-      anoLetivo: anoLetivo.trim(),
-    });
+    const anoNumero = parseInt(ano, 10);
+    if (isNaN(anoNumero)) {
+      Alert.alert('Ano inválido', 'Digite um ano válido, ex: 2026.');
+      return;
+    }
 
-    // Reset dos campos
-    setNome('');
-    setDisciplina('');
-    setAnoLetivo('');
-    onClose();
+    try {
+      setCriando(true);
+
+      const novaSala = await salaService.criarSala({
+        nome: nome.trim(),
+        disciplina: disciplina.trim(),
+        ano: anoNumero,
+      });
+
+      // O código de convite é o que o professor vai compartilhar com os alunos
+      Alert.alert(
+        'Sala criada!',
+        `Código de convite: ${novaSala.codigConvite}\n\nCompartilhe esse código com seus alunos.`
+      );
+
+      onSalaCriada(novaSala);
+      limparCampos();
+      onClose();
+    } catch (error: any) {
+      Alert.alert(
+        'Erro ao criar sala',
+        error.response?.data?.mensagem || 'Não foi possível criar a sala.'
+      );
+    } finally {
+      setCriando(false);
+    }
   };
 
-  const handleClose = () => {
-    setErro('');
+  const handleFechar = () => {
+    limparCampos();
     onClose();
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={handleClose}
-    >
-      <View style={modalStyles.overlay}>
-        <View style={modalStyles.container}>
-          <Text style={modalStyles.title}>Criar Nova Sala</Text>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleFechar}>
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <Text style={styles.titulo}>Criar nova sala</Text>
 
-          {erro ? <Text style={modalStyles.erroText}>{erro}</Text> : null}
-
-          <Text style={modalStyles.label}>Período / Nome da Turma *</Text>
+          <Text style={styles.label}>Nome da sala</Text>
           <TextInput
-            style={modalStyles.input}
-            placeholder="Ex: Noite - Turma A"
+            style={styles.input}
+            placeholder="Ex: Desenvolvimento Web"
             value={nome}
             onChangeText={setNome}
           />
 
-          <Text style={modalStyles.label}>Matéria / Disciplina *</Text>
+          <Text style={styles.label}>Disciplina</Text>
           <TextInput
-            style={modalStyles.input}
-            placeholder="Ex: Programação Mobile"
+            style={styles.input}
+            placeholder="Ex: Programação Web"
             value={disciplina}
             onChangeText={setDisciplina}
           />
 
-          <Text style={modalStyles.label}>Ano Letivo / Semestre *</Text>
+          <Text style={styles.label}>Ano</Text>
           <TextInput
-            style={modalStyles.input}
-            placeholder="Ex: 2026 / 1º Semestre"
-            value={anoLetivo}
-            onChangeText={setAnoLetivo}
+            style={styles.input}
+            placeholder="Ex: 2026"
+            value={ano}
+            onChangeText={setAno}
+            keyboardType="numeric"
           />
 
-          <View style={modalStyles.buttonRow}>
-            <TouchableOpacity style={modalStyles.btnCancel} onPress={handleClose}>
-              <Text style={modalStyles.btnCancelText}>Cancelar</Text>
+          <View style={styles.botoes}>
+            <TouchableOpacity
+              style={[styles.botao, styles.botaoCancelar]}
+              onPress={handleFechar}
+              disabled={criando}
+            >
+              <Text style={styles.textoCancelar}>Cancelar</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={modalStyles.btnSubmit} onPress={handleSubmit}>
-              <Text style={modalStyles.btnSubmitText}>Criar Sala</Text>
+            <TouchableOpacity
+              style={[styles.botao, styles.botaoCriar]}
+              onPress={handleCriar}
+              disabled={criando}
+            >
+              {criando ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={styles.textoCriar}>Criar sala</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -99,70 +133,63 @@ export function ModalCriarSala({ visible, onClose, onSubmit }: ModalCriarSalaPro
   );
 }
 
-const modalStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    alignItems: 'center',
   },
-  container: {
+  card: {
+    width: '85%',
     backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 20,
   },
-  title: {
-    fontSize: 20,
+  titulo: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#212529',
     marginBottom: 16,
+    color: '#212529',
   },
   label: {
     fontSize: 13,
-    fontWeight: '600',
     color: '#495057',
-    marginBottom: 6,
+    marginBottom: 4,
     marginTop: 10,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#CED4DA',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    backgroundColor: '#F1F3F5',
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14,
-    backgroundColor: '#F8F9FA',
+    color: '#212529',
   },
-  erroText: {
-    color: '#E03131',
-    fontSize: 13,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  buttonRow: {
+  botoes: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 24,
+    gap: 10,
+    marginTop: 20,
   },
-  btnCancel: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#E9ECEF',
+  botao: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  btnCancelText: {
-    color: '#495057',
-    fontWeight: '600',
+  botaoCancelar: {
+    backgroundColor: '#F1F3F5',
   },
-  btnSubmit: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+  botaoCriar: {
     backgroundColor: '#155DFC',
   },
-  btnSubmitText: {
+  textoCancelar: {
+    color: '#495057',
+    fontWeight: 'bold',
+  },
+  textoCriar: {
     color: '#FFF',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });

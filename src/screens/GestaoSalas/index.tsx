@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  FlatList,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+import { View, Text, FlatList, ActivityIndicator, Alert } from "react-native";
 import { BotaoCriarSala } from "../../components/Button/BotaoCriarSala/BotaoCriarSala";
 import { CardSala } from "../../components/CardSala/CardSala";
 import { ModalCriarSala } from "../../components/Modal/ModalCriarSala/ModalCriarSala";
@@ -27,7 +21,7 @@ export function GestaoSalas() {
     } catch (error: any) {
       Alert.alert(
         "Erro ao carregar",
-        error.response?.data?.message || "Não foi possível carregar as salas.",
+        error.response?.data?.mensagem || "Não foi possível carregar as salas.",
       );
     } finally {
       setLoading(false);
@@ -38,27 +32,37 @@ export function GestaoSalas() {
     carregarSalas();
   }, []);
 
-  // Envia os dados para a API e adiciona na lista após resposta 201 Created
+  // O Modal manda o ano como texto (anoLetivo); aqui convertemos pro formato do backend
   const handleCriarSala = async (novosDados: {
     nome: string;
     disciplina: string;
     anoLetivo: string;
   }) => {
+    const anoNumero = parseInt(novosDados.anoLetivo, 10);
+
+    if (isNaN(anoNumero)) {
+      Alert.alert("Ano inválido", "Digite um ano válido, ex: 2026.");
+      return;
+    }
+
     try {
       const salaCriada = await salaService.criarSala({
         nome: novosDados.nome,
         disciplina: novosDados.disciplina,
-        anoLetivo: novosDados.anoLetivo,
+        ano: anoNumero,
       });
 
       // Atualiza a lista localmente adicionando a resposta oficial da API no topo
       setSalas((prevSalas) => [salaCriada, ...prevSalas]);
       setModalVisible(false);
-      Alert.alert("Sucesso", "Sala criada com sucesso!");
+      Alert.alert(
+        "Sucesso",
+        `Sala criada! Código de convite: ${salaCriada.codigConvite}`,
+      );
     } catch (error: any) {
       Alert.alert(
         "Erro ao criar sala",
-        error.response?.data?.message || "Falha ao conectar com o servidor.",
+        error.response?.data?.mensagem || "Falha ao conectar com o servidor.",
       );
     }
   };
@@ -81,15 +85,15 @@ export function GestaoSalas() {
       ) : (
         <FlatList
           data={salas}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <CardSala
-              id={item.id}
+              id={item.id.toString()}
               periodo={item.nome}
               materia={item.disciplina}
-              ano={item.anoLetivo}
-              numAlunos={item.numAlunos}
-              codigoConvite={item.codigoConvite}
+              ano={item.ano.toString()}
+              numAlunos={item.quantidadeAlunos}
+              codigoConvite={item.codigConvite}
             />
           )}
           contentContainerStyle={{ paddingBottom: 30, paddingTop: 10 }}
@@ -109,7 +113,10 @@ export function GestaoSalas() {
       <ModalCriarSala
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSubmit={handleCriarSala}
+        onSalaCriada={(novaSala) => {
+          setSalas((prevSalas) => [novaSala, ...prevSalas]);
+          setModalVisible(false);
+        }}
       />
     </View>
   );

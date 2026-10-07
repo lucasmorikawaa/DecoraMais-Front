@@ -5,20 +5,26 @@ import * as Clipboard from 'expo-clipboard';
 import { styles } from './CardSalaStyle';
 import { CardSalaProps } from './types'; 
 
+// Estende as props existentes com o clique nos três pontos
+type CardSalaComMenuProps = CardSalaProps & {
+  onPressMenu?: () => void;
+};
+
 export function CardSala({
   periodo,
   ano,
   materia,
   numAlunos,
-  codigoConvite
-}: CardSalaProps) {
+  codigoConvite,
+  onPressMenu,
+}: CardSalaComMenuProps) {
 
   // Função para copiar o código de convite para a área de transferência
   const handleCopyCode = async () => {
     await Clipboard.setStringAsync(codigoConvite);
     Alert.alert('Copiado!', 'Código de convite copiado para a área de transferência.');
   };
-
+  
   return (
     <View style={styles.container}>
       {/* Cabeçalho do Card */}
@@ -27,7 +33,7 @@ export function CardSala({
           <Text style={styles.periodoText}>{periodo}</Text>
           <Text style={styles.anoText}>{ano}</Text>
         </View>
-        <TouchableOpacity style={{ padding: 4 }}>
+        <TouchableOpacity style={{ padding: 4 }} onPress={onPressMenu}>
           <Feather name="more-vertical" size={20} color="#6C757D" />
         </TouchableOpacity>
       </View>

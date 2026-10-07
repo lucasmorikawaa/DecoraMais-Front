@@ -26,4 +26,15 @@ export const salaService = {
       params: { codigo },
     });
   },
+
+    // PUT: Atualiza uma sala existente
+  atualizarSala: async (id: number, payload: CriarSalaPayload): Promise<SalaDTO> => {
+    const response = await api.put<SalaDTO>(`/salas/${id}`, payload);
+    return response.data;
+  },
+
+  // DELETE: Exclui uma sala
+  excluirSala: async (id: number): Promise<void> => {
+    await api.delete(`/salas/${id}`);
+  },
 };

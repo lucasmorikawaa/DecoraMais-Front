@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -16,21 +16,38 @@ interface ModalCriarSalaProps {
   visible: boolean;
   onClose: () => void;
   onSalaCriada: (novaSala: SalaDTO) => void;
+  salaParaEditar?: SalaDTO | null;
+  onSalaAtualizada?: (sala: SalaDTO) => void;
 }
 
-export function ModalCriarSala({ visible, onClose, onSalaCriada }: ModalCriarSalaProps) {
+export function ModalCriarSala({
+  visible,
+  onClose,
+  onSalaCriada,
+  salaParaEditar,
+  onSalaAtualizada,
+}: ModalCriarSalaProps) {
   const [nome, setNome] = useState('');
   const [disciplina, setDisciplina] = useState('');
   const [ano, setAno] = useState('');
-  const [criando, setCriando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
-  const limparCampos = () => {
-    setNome('');
-    setDisciplina('');
-    setAno('');
-  };
+  const modoEdicao = !!salaParaEditar;
 
-  const handleCriar = async () => {
+  // Preenche os campos ao abrir em modo edição; limpa ao abrir em modo criação
+  useEffect(() => {
+    if (visible && salaParaEditar) {
+      setNome(salaParaEditar.nome);
+      setDisciplina(salaParaEditar.disciplina);
+      setAno(String(salaParaEditar.ano));
+    } else if (visible) {
+      setNome('');
+      setDisciplina('');
+      setAno('');
+    }
+  }, [visible, salaParaEditar]);
+
+  const handleSalvar = async () => {
     if (!nome.trim() || !disciplina.trim() || !ano.trim()) {
       Alert.alert('Campos obrigatórios', 'Preencha nome, disciplina e ano.');
       return;
@@ -42,44 +59,44 @@ export function ModalCriarSala({ visible, onClose, onSalaCriada }: ModalCriarSal
       return;
     }
 
+    const payload = {
+      nome: nome.trim(),
+      disciplina: disciplina.trim(),
+      ano: anoNumero,
+    };
+
     try {
-      setCriando(true);
+      setSalvando(true);
 
-      const novaSala = await salaService.criarSala({
-        nome: nome.trim(),
-        disciplina: disciplina.trim(),
-        ano: anoNumero,
-      });
+      if (salaParaEditar) {
+        const salaAtualizada = await salaService.atualizarSala(salaParaEditar.id, payload);
+        Alert.alert('Sucesso', 'Sala atualizada com sucesso!');
+        onSalaAtualizada?.(salaAtualizada);
+      } else {
+        const novaSala = await salaService.criarSala(payload);
+        Alert.alert(
+          'Sala criada!',
+          `Código de convite: ${novaSala.codigConvite}\n\nCompartilhe esse código com seus alunos.`
+        );
+        onSalaCriada(novaSala);
+      }
 
-      // O código de convite é o que o professor vai compartilhar com os alunos
-      Alert.alert(
-        'Sala criada!',
-        `Código de convite: ${novaSala.codigConvite}\n\nCompartilhe esse código com seus alunos.`
-      );
-
-      onSalaCriada(novaSala);
-      limparCampos();
       onClose();
     } catch (error: any) {
       Alert.alert(
-        'Erro ao criar sala',
-        error.response?.data?.mensagem || 'Não foi possível criar a sala.'
+        modoEdicao ? 'Erro ao atualizar sala' : 'Erro ao criar sala',
+        error.response?.data?.mensagem || 'Não foi possível salvar a sala.'
       );
     } finally {
-      setCriando(false);
+      setSalvando(false);
     }
   };
 
-  const handleFechar = () => {
-    limparCampos();
-    onClose();
-  };
-
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleFechar}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.titulo}>Criar nova sala</Text>
+          <Text style={styles.titulo}>{modoEdicao ? 'Editar sala' : 'Criar nova sala'}</Text>
 
           <Text style={styles.label}>Nome da sala</Text>
           <TextInput
@@ -109,21 +126,21 @@ export function ModalCriarSala({ visible, onClose, onSalaCriada }: ModalCriarSal
           <View style={styles.botoes}>
             <TouchableOpacity
               style={[styles.botao, styles.botaoCancelar]}
-              onPress={handleFechar}
-              disabled={criando}
+              onPress={onClose}
+              disabled={salvando}
             >
               <Text style={styles.textoCancelar}>Cancelar</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.botao, styles.botaoCriar]}
-              onPress={handleCriar}
-              disabled={criando}
+              onPress={handleSalvar}
+              disabled={salvando}
             >
-              {criando ? (
+              {salvando ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
-                <Text style={styles.textoCriar}>Criar sala</Text>
+                <Text style={styles.textoCriar}>{modoEdicao ? 'Salvar' : 'Criar sala'}</Text>
               )}
             </TouchableOpacity>
           </View>

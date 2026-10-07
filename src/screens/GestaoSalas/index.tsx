@@ -9,6 +9,7 @@ import { styles } from "./styles";
 
 export function GestaoSalas() {
   const [modalVisible, setModalVisible] = useState(false);
+  const [salaEmEdicao, setSalaEmEdicao] = useState<SalaDTO | null>(null);
   const [salas, setSalas] = useState<SalaDTO[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,39 +33,66 @@ export function GestaoSalas() {
     carregarSalas();
   }, []);
 
-  // O Modal manda o ano como texto (anoLetivo); aqui convertemos pro formato do backend
-  const handleCriarSala = async (novosDados: {
-    nome: string;
-    disciplina: string;
-    anoLetivo: string;
-  }) => {
-    const anoNumero = parseInt(novosDados.anoLetivo, 10);
+  // Pede confirmação e exclui a sala no backend
+  const handleExcluirSala = (sala: SalaDTO) => {
+    Alert.alert(
+      "Excluir sala",
+      `Tem certeza que deseja excluir "${sala.nome}"? Essa ação não pode ser desfeita.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await salaService.excluirSala(sala.id);
+              setSalas((prev) => prev.filter((s) => s.id !== sala.id));
+            } catch (error: any) {
+              const status = error.response?.status;
 
-    if (isNaN(anoNumero)) {
-      Alert.alert("Ano inválido", "Digite um ano válido, ex: 2026.");
-      return;
-    }
+              if (status === 403) {
+                // Sala de outro professor
+                Alert.alert(
+                  "Sem permissão",
+                  error.response?.data?.mensagem ||
+                    "Você não tem permissão para excluir esta sala.",
+                );
+              } else if (status === 500) {
+                Alert.alert(
+                  "Não foi possível excluir",
+                  "Essa sala provavelmente tem flashcards vinculados. Remova os flashcards dela antes de excluir.",
+                );
+              } else {
+                Alert.alert(
+                  "Erro ao excluir",
+                  error.response?.data?.mensagem ||
+                    "Não foi possível excluir a sala.",
+                );
+              }
+            }
+          },
+        },
+      ],
+    );
+  };
 
-    try {
-      const salaCriada = await salaService.criarSala({
-        nome: novosDados.nome,
-        disciplina: novosDados.disciplina,
-        ano: anoNumero,
-      });
-
-      // Atualiza a lista localmente adicionando a resposta oficial da API no topo
-      setSalas((prevSalas) => [salaCriada, ...prevSalas]);
-      setModalVisible(false);
-      Alert.alert(
-        "Sucesso",
-        `Sala criada! Código de convite: ${salaCriada.codigConvite}`,
-      );
-    } catch (error: any) {
-      Alert.alert(
-        "Erro ao criar sala",
-        error.response?.data?.mensagem || "Falha ao conectar com o servidor.",
-      );
-    }
+  // Menu aberto ao tocar nos três pontos do card
+  const abrirOpcoesSala = (sala: SalaDTO) => {
+    Alert.alert(sala.nome, "O que você deseja fazer?", [
+      {
+        text: "Editar",
+        onPress: () => {
+          setSalaEmEdicao(sala);
+          setModalVisible(true);
+        },
+      },
+      {
+        text: "Excluir",
+        style: "destructive",
+        onPress: () => handleExcluirSala(sala),
+      },
+      { text: "Cancelar", style: "cancel" },
+    ]);
   };
 
   return (
@@ -74,7 +102,12 @@ export function GestaoSalas() {
         <Text style={styles.subtitle}>Gerencie suas turmas e disciplinas</Text>
       </View>
 
-      <BotaoCriarSala onPress={() => setModalVisible(true)} />
+      <BotaoCriarSala
+        onPress={() => {
+          setSalaEmEdicao(null);
+          setModalVisible(true);
+        }}
+      />
 
       {loading ? (
         <View
@@ -88,12 +121,13 @@ export function GestaoSalas() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <CardSala
-              id={item.id.toString()}
+              id={String(item.id)}
               periodo={item.nome}
               materia={item.disciplina}
-              ano={item.ano.toString()}
+              ano={String(item.ano)}
               numAlunos={item.quantidadeAlunos}
               codigoConvite={item.codigConvite}
+              onPressMenu={() => abrirOpcoesSala(item)}
             />
           )}
           contentContainerStyle={{ paddingBottom: 30, paddingTop: 10 }}
@@ -112,10 +146,18 @@ export function GestaoSalas() {
 
       <ModalCriarSala
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSalaCriada={(novaSala) => {
-          setSalas((prevSalas) => [novaSala, ...prevSalas]);
+        salaParaEditar={salaEmEdicao}
+        onClose={() => {
           setModalVisible(false);
+          setSalaEmEdicao(null);
+        }}
+        onSalaCriada={(novaSala) => {
+          setSalas((prev) => [novaSala, ...prev]);
+        }}
+        onSalaAtualizada={(salaAtualizada) => {
+          setSalas((prev) =>
+            prev.map((s) => (s.id === salaAtualizada.id ? salaAtualizada : s)),
+          );
         }}
       />
     </View>

@@ -1,5 +1,15 @@
 import { api } from "../api";
-import { SalaDTO, CriarSalaPayload } from "./types";
+import { CriarSalaPayload } from "./types";
+
+type SalaDTO = {
+  id: number;
+  nome: string;
+  disciplina: string;
+  ano: number;
+  codigConvite: string;
+  professorNome?: string | null;
+  quantidadeAlunos?: number | null;
+};
 
 export const salaService = {
   // GET: Busca todas as salas cadastradas do usuário logado
@@ -16,19 +26,24 @@ export const salaService = {
 
   // GET: Busca uma sala pelo código de convite (usado pelo aluno antes de ingressar)
   buscarSalaPorCodigo: async (codigo: string): Promise<SalaDTO> => {
-    const response = await api.get<SalaDTO>(`/salas/buscar/${codigo}`);
-    return response.data;
+    const { data } = await api.get(
+      `/salas/buscar/${encodeURIComponent(codigo)}`,
+    );
+    return data;
   },
 
-  // POST: Ingressa o aluno logado na sala pelo código
-  ingressarNaSala: async (codigo: string): Promise<void> => {
-    await api.post("/salas/ingressar", null, {
+  ingressarNaSala: async (codigo: string): Promise<SalaDTO> => {
+    const { data } = await api.post("/salas/ingressar", null, {
       params: { codigo },
     });
+    return data;
   },
 
-    // PUT: Atualiza uma sala existente
-  atualizarSala: async (id: number, payload: CriarSalaPayload): Promise<SalaDTO> => {
+  // PUT: Atualiza uma sala existente
+  atualizarSala: async (
+    id: number,
+    payload: CriarSalaPayload,
+  ): Promise<SalaDTO> => {
     const response = await api.put<SalaDTO>(`/salas/${id}`, payload);
     return response.data;
   },

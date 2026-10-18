@@ -2,36 +2,70 @@ import React, { useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import "react-native-gesture-handler";
 import { NavigationContainer } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { DrawerRoutes } from "./src/navigation/DrawerRoutes";
 import { LoginScreen } from "./src/screens/Login";
-import { HomeAluno } from "./src/screens/HomeAluno";
 import { AlunoRoutes } from "./src/navigation/AlunoRoutes";
+import { EscolherCriarConta } from "./src/screens/EscolherCriarConta";
+import { CriarConta } from "./src/screens/CriarConta";
 
 export default function App() {
-  // Guarda o usuário logado (id, nome, email, tipo, ...).
-  // Enquanto for null, mostramos a tela de Login.
   const [usuarioLogado, setUsuarioLogado] = useState(null);
+  // 'login' | 'escolherCriarConta' | 'criarConta'
+  const [telaAuth, setTelaAuth] = useState("login");
+  const [tipoCadastro, setTipoCadastro] = useState(null);
 
-  // Ainda não logou -> mostra a tela de Login.
-  // O LoginScreen chama isso passando os dados do usuário assim que o login der certo.
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem("@DecoraPlus:token");
+    } finally {
+      setUsuarioLogado(null);
+      setTelaAuth("login");
+      setTipoCadastro(null);
+    }
+  };
+
   if (!usuarioLogado) {
+    if (telaAuth === "criarConta" && tipoCadastro) {
+      return (
+        <CriarConta
+          tipo={tipoCadastro}
+          onVoltar={() => setTelaAuth("escolherCriarConta")}
+          onCadastroSuccess={(usuario) => setUsuarioLogado(usuario)}
+        />
+      );
+    }
+
+    if (telaAuth === "escolherCriarConta") {
+      return (
+        <EscolherCriarConta
+          onVoltar={() => setTelaAuth("login")}
+          onContinuar={(tipo) => {
+            setTipoCadastro(tipo);
+            setTelaAuth("criarConta");
+          }}
+        />
+      );
+    }
+
     return (
-      <LoginScreen onLoginSuccess={(usuario) => setUsuarioLogado(usuario)} />
+      <LoginScreen
+        onLoginSuccess={(usuario) => setUsuarioLogado(usuario)}
+        onNavigateToRegister={() => setTelaAuth("escolherCriarConta")}
+      />
     );
   }
 
-  // Logou como PROFESSOR -> vai para o Drawer de Gestão de Salas.
   if (usuarioLogado.tipo === "PROFESSOR") {
     return (
       <NavigationContainer>
         <StatusBar style="auto" />
-        <DrawerRoutes />
+        <DrawerRoutes onLogout={handleLogout} />
       </NavigationContainer>
     );
   }
 
-  // Logou como ALUNO -> vai para a Home do Aluno.
   return (
     <NavigationContainer>
       <StatusBar style="auto" />

@@ -2,31 +2,35 @@ import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Feather } from '@expo/vector-icons';
 
-// Importação das suas Telas
 import { GestaoSalas } from '../screens/GestaoSalas';
 import { BancoDeCards } from '../screens/BancoDeCards';
 import { Configuracoes } from '../screens/Configuracao';
 
-// Componente Customizado que criamos no Passo 3
 import { CustomDrawerContent } from '../components/CustomDrawer/CustomDrawer';
 
 const Drawer = createDrawerNavigator();
 
-export function DrawerRoutes() {
+type DrawerRoutesProps = {
+  onLogout: () => void;
+};
+
+export function DrawerRoutes({ onLogout }: DrawerRoutesProps) {
   return (
     <Drawer.Navigator
-      drawerContent={(props) => <CustomDrawerContent {...props} />}
+      drawerContent={(props) => (
+        <CustomDrawerContent {...props} onLogout={onLogout} />
+      )}
       screenOptions={{
-        headerShown: true, // Mostra o botão hambúrguer nativo no topo das telas
+        headerShown: true,
         headerTintColor: '#000000',
         headerStyle: {
           backgroundColor: '#F8F9FA',
           elevation: 0,
           shadowOpacity: 0,
         },
-        drawerActiveBackgroundColor: '#EDF2FF', // Fundo suave para o item ativo
-        drawerActiveTintColor: '#155DFC',       // Texto/Ícone do item ativo
-        drawerInactiveTintColor: '#495057',     // Texto/Ícone inativo
+        drawerActiveBackgroundColor: '#EDF2FF',
+        drawerActiveTintColor: '#155DFC',
+        drawerInactiveTintColor: '#495057',
         drawerItemStyle: {
           borderRadius: 12,
           paddingHorizontal: 8,
@@ -35,7 +39,7 @@ export function DrawerRoutes() {
         drawerLabelStyle: {
           fontSize: 15,
           fontWeight: '500',
-          marginLeft: 12, // Ajusta o espaçamento entre o ícone e o texto
+          marginLeft: 12,
         },
       }}
     >
@@ -44,7 +48,7 @@ export function DrawerRoutes() {
         component={GestaoSalas}
         options={{
           drawerLabel: 'Salas',
-          title: '', // Remove o título do header para manter a tela limpa
+          title: '',
           drawerIcon: ({ color, size }) => (
             <Feather name="home" size={size} color={color} />
           ),

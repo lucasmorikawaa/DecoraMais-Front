@@ -1,298 +1,123 @@
-import React, { useState } from "react";
-
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Modal,
-} from "react-native";
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
+} from 'react-native';
+import { salaService } from '../../services/sala';
 
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+type SalaDTO = Awaited<ReturnType<typeof salaService.buscarSalaPorCodigo>>;
 
-import { styles } from "./style";
+type Props = { onIngressou?: (sala: SalaDTO) => void };
 
-import { salaService } from "../../services/sala";
-import { SalaDTO } from "../../services/sala/types";
+function extrairErro(e: any): string {
+  if (!e?.response) return 'Não foi possível conectar ao servidor.';
+  if (e.response.status === 404) return 'Nenhuma sala encontrada com esse código';
+  return e.response.data?.mensagem || 'Erro ao buscar a sala.';
+}
 
-export function SecaoIngressarSala() {
-  const [codigoSala, setCodigoSala] = useState("");
+export function SecaoIngressarSala({ onIngressou }: Props) {
+  const [codigo, setCodigo] = useState('');
+  const [sala, setSala] = useState<SalaDTO | null>(null);
+  const [erro, setErro] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [ingressando, setIngressando] = useState(false);
+  const [ingressou, setIngressou] = useState(false);
 
-  const [loadingBusca, setLoadingBusca] = useState(false);
-  const [loadingEntrada, setLoadingEntrada] = useState(false);
-
-  const [salaPreview, setSalaPreview] = useState<SalaDTO | null>(null);
-
-  const [modalVisible, setModalVisible] = useState(false);
-
-  // =========================================================
-  // 1. BUSCAR SALA PELO CÓDIGO
-  // =========================================================
-  const handleBuscarSala = async () => {
-    const codigoLimpo = codigoSala.trim().toUpperCase();
-
-    if (!codigoLimpo) {
-      Alert.alert(
-        "Atenção",
-        "Digite o código da sala para buscar."
-      );
-      return;
-    }
-
+  const buscar = async () => {
+    const c = codigo.trim().toUpperCase();
+    if (!c) { setErro('Digite o código da sala'); setSala(null); return; }
+    setBuscando(true); setErro(''); setSala(null); setIngressou(false);
     try {
-      setLoadingBusca(true);
-
-      // Busca a sala no backend
-      const sala = await salaService.buscarSalaPorCodigo(codigoLimpo);
-
-      // Salva os dados da sala
-      setSalaPreview(sala);
-
-      // Abre o modal com os dados encontrados
-      setModalVisible(true);
-
-    } catch (error: any) {
-      console.log("Erro ao buscar sala:", error);
-
-      if (error.response?.status === 404) {
-        Alert.alert(
-          "Sala não encontrada",
-          "Não existe nenhuma sala com esse código."
-        );
-      } else if (error.response?.status === 401) {
-        Alert.alert(
-          "Sessão expirada",
-          "Faça login novamente para continuar."
-        );
-      } else {
-        Alert.alert(
-          "Erro",
-          "Não foi possível buscar a sala."
-        );
-      }
+      setSala(await salaService.buscarSalaPorCodigo(c));
+    } catch (e) {
+      setErro(extrairErro(e));
     } finally {
-      setLoadingBusca(false);
+      setBuscando(false);
     }
   };
 
-  // =========================================================
-  // 2. CONFIRMAR ENTRADA NA SALA
-  // =========================================================
-  const handleConfirmarEntrada = async () => {
-    if (!salaPreview) {
-      return;
-    }
-
-    try {
-      setLoadingEntrada(true);
-
-      // Envia o código da sala para o backend
-      await salaService.ingressarNaSala(
-        salaPreview.codigConvite
-      );
-
-      Alert.alert(
-        "Sucesso!",
-        `Você entrou na sala "${salaPreview.nome}".`
-      );
-
-      // Fecha o modal
-      setModalVisible(false);
-
-      // Limpa o campo
-      setCodigoSala("");
-
-      // Limpa a sala selecionada
-      setSalaPreview(null);
-
-    } catch (error: any) {
-      console.log("Erro ao ingressar na sala:", error);
-
-      if (error.response?.status === 404) {
-        Alert.alert(
-          "Sala não encontrada",
-          "Essa sala não existe ou o código é inválido."
-        );
-      } else if (error.response?.status === 409) {
-        Alert.alert(
-          "Atenção",
-          "Você já está nesta sala."
-        );
-      } else if (error.response?.status === 401) {
-        Alert.alert(
-          "Sessão expirada",
-          "Faça login novamente para continuar."
-        );
-      } else {
-        Alert.alert(
-          "Erro ao entrar",
-          error.response?.data?.message ||
-            "Não foi possível ingressar na sala."
-        );
-      }
-    } finally {
-      setLoadingEntrada(false);
-    }
+  const ingressar = () => {
+    if (!sala) return;
+    Alert.alert('Ingressar', `Deseja entrar na sala "${sala.nome}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Ingressar',
+        onPress: async () => {
+          setIngressando(true);
+          try {
+            await salaService.ingressarNaSala(sala.codigConvite);
+            setIngressou(true);
+            onIngressou?.(sala);
+          } catch (e: any) {
+            Alert.alert('Erro', e?.response?.data?.mensagem || 'Não foi possível ingressar.');
+          } finally {
+            setIngressando(false);
+          }
+        },
+      },
+    ]);
   };
 
-  // =========================================================
-  // 3. FECHAR MODAL
-  // =========================================================
-  const handleFecharModal = () => {
-    if (loadingEntrada) {
-      return;
-    }
-
-    setModalVisible(false);
-    setSalaPreview(null);
-  };
-
-  // =========================================================
-  // 4. RENDER
-  // =========================================================
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>
-        Ingressar em uma sala
-      </Text>
+      <Text style={styles.title}>Ingressar em uma sala</Text>
+      <Text style={styles.subtitle}>Digite o código de convite fornecido pelo professor</Text>
 
-      <Text style={styles.sectionSubtitle}>
-        Entre em uma sala usando o código fornecido pelo seu professor.
-      </Text>
-
-      {/* Campo para digitar o código */}
-      <View style={styles.inputRow}>
+      <View style={styles.row}>
         <TextInput
           style={styles.input}
-          placeholder="Código da sala (ex: ABC123)"
-          placeholderTextColor="#ADB5BD"
-          value={codigoSala}
-          onChangeText={setCodigoSala}
+          placeholder="Código da sala"
+          placeholderTextColor="#868E96"
+          value={codigo}
+          onChangeText={setCodigo}
           autoCapitalize="characters"
           autoCorrect={false}
-          editable={!loadingBusca}
+          returnKeyType="search"
+          onSubmitEditing={buscar}
         />
-
-        <TouchableOpacity
-          style={styles.enterButton}
-          onPress={handleBuscarSala}
-          disabled={loadingBusca}
-        >
-          {loadingBusca ? (
-            <ActivityIndicator
-              color="#FFFFFF"
-              size="small"
-            />
-          ) : (
-            <Text style={styles.enterButtonText}>
-              ENTRAR
-            </Text>
-          )}
+        <TouchableOpacity style={styles.button} onPress={buscar} disabled={buscando}>
+          {buscando ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Buscar</Text>}
         </TouchableOpacity>
       </View>
 
-      {/* =====================================================
-          MODAL DE CONFIRMAÇÃO
-          ===================================================== */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={handleFecharModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+      {!!erro && <Text style={styles.erro}>{erro}</Text>}
 
-            {/* Cabeçalho */}
-            <View style={styles.modalHeader}>
-              <MaterialCommunityIcons
-                name="school"
-                size={28}
-                color="#155DFC"
-              />
-
-              <Text style={styles.modalTitle}>
-                Confirmar Sala
-              </Text>
-            </View>
-
-            {/* Informações da sala */}
-            {salaPreview && (
-              <View style={styles.salaDetails}>
-
-                {/* Nome da sala */}
-                <Text style={styles.salaNome}>
-                  {salaPreview.nome}
-                </Text>
-
-                {/* Disciplina */}
-                <Text style={styles.detailText}>
-                  <Text style={styles.detailBold}>
-                    Disciplina:{" "}
-                  </Text>
-
-                  {salaPreview.disciplina}
-                </Text>
-
-                {/* Ano */}
-                <Text style={styles.detailText}>
-                  <Text style={styles.detailBold}>
-                    Ano:{" "}
-                  </Text>
-
-                  {salaPreview.ano}
-                </Text>
-
-                {/* Código da sala */}
-                <Text style={styles.detailText}>
-                  <Text style={styles.detailBold}>
-                    Código:{" "}
-                  </Text>
-
-                  {salaPreview.codigConvite}
-                </Text>
-
-              </View>
-            )}
-
-            {/* Botões */}
-            <View style={styles.modalActions}>
-
-              {/* Cancelar */}
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={handleFecharModal}
-                disabled={loadingEntrada}
-              >
-                <Text style={styles.cancelButtonText}>
-                  Cancelar
-                </Text>
-              </TouchableOpacity>
-
-              {/* Confirmar */}
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleConfirmarEntrada}
-                disabled={loadingEntrada}
-              >
-                {loadingEntrada ? (
-                  <ActivityIndicator
-                    color="#FFFFFF"
-                    size="small"
-                  />
-                ) : (
-                  <Text style={styles.confirmButtonText}>
-                    Confirmar
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-            </View>
-          </View>
+      {sala && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{sala.nome}</Text>
+          <Text style={styles.cardText}>{sala.disciplina} • {sala.ano}</Text>
+          {!!sala.professorNome && <Text style={styles.cardText}>Professor: {sala.professorNome}</Text>}
+          {sala.quantidadeAlunos != null && (
+            <Text style={styles.cardText}>{sala.quantidadeAlunos} aluno(s)</Text>
+          )}
+          {ingressou ? (
+            <Text style={styles.ok}>Você está nesta sala ✓</Text>
+          ) : (
+            <TouchableOpacity style={[styles.button, styles.full]} onPress={ingressar} disabled={ingressando}>
+              {ingressando
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.buttonText}>Ingressar nesta sala</Text>}
+            </TouchableOpacity>
+          )}
         </View>
-      </Modal>
+      )}
     </View>
   );
 }
+
+export default SecaoIngressarSala;
+
+const styles = StyleSheet.create({
+  container: { marginVertical: 16 },
+  title: { fontSize: 18, fontWeight: 'bold', color: '#212529' },
+  subtitle: { fontSize: 13, color: '#868E96', marginBottom: 12 },
+  row: { flexDirection: 'row', gap: 8 },
+  input: { flex: 1, backgroundColor: '#F1F3F5', borderRadius: 10, paddingHorizontal: 12, height: 46, color: '#212529' },
+  button: { backgroundColor: '#155DFC', borderRadius: 10, paddingHorizontal: 16, height: 46, justifyContent: 'center', alignItems: 'center' },
+  full: { marginTop: 12 },
+  buttonText: { color: '#fff', fontWeight: '600' },
+  erro: { color: '#E03131', marginTop: 8, fontSize: 13 },
+  card: { marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E9ECEF' },
+  cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#212529' },
+  cardText: { fontSize: 13, color: '#495057', marginTop: 4 },
+  ok: { marginTop: 12, color: '#2F9E44', fontWeight: '600' },
+});

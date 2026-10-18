@@ -1,114 +1,80 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import {
   DrawerContentScrollView,
   DrawerItemList,
   DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../../services/api'; // Ajuste o caminho da sua instância Axios
+import { api } from '../../services/api';
 
-export function CustomDrawerContent(props: DrawerContentComponentProps) {
-  const [usuario, setUsuario] = useState({ nome: '', email: '', tipo: '' });
-  const [loading, setLoading] = useState(true);
+type CustomDrawerProps = DrawerContentComponentProps & {
+  onLogout: () => void;
+};
 
-  // 1. Busca os dados do usuário autenticado no Spring Boot
+type UsuarioMe = { nome: string; email: string };
+
+function iniciais(nome: string) {
+  const partes = nome.trim().split(/\s+/);
+  const a = partes[0]?.[0] ?? '';
+  const b = partes.length > 1 ? partes[1][0] : partes[0]?.[1] ?? '';
+  return (a + b).toUpperCase();
+}
+
+export function CustomDrawerContent({ onLogout, ...props }: CustomDrawerProps) {
+  const [usuario, setUsuario] = useState<UsuarioMe | null>(null);
+
   useEffect(() => {
-    async function carregarPerfil() {
-      try {
-        setLoading(true);
-        const response = await api.get('/auth/me');
-        setUsuario({
-          nome: response.data.nome || '',
-          email: response.data.email || '',
-          tipo: response.data.tipo || '',
-        });
-      } catch (error) {
-        console.log('Erro ao carregar dados do usuário no Drawer:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    carregarPerfil();
+    api
+      .get('/usuarios/me')
+      .then(({ data }) => setUsuario({ nome: data.nome, email: data.email }))
+      .catch(() => {});
   }, []);
 
-  // 2. Extrai as iniciais do nome (ex: "Lucas Morikawa" -> "LM")
-  const obterIniciais = (nome: string) => {
-    if (!nome) return 'U';
-    const partes = nome.trim().split(' ');
-    if (partes.length === 1) return partes[0].substring(0, 2).toUpperCase();
-    return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+  const confirmarSaida = () => {
+    Alert.alert('Sair', 'Deseja realmente sair da sua conta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: onLogout },
+    ]);
   };
 
-  // 3. Executa a limpeza do token e redireciona para a tela de Login
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('@DecoraPlus:token');
-      // Redireciona para o fluxo de autenticação/login
-      props.navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }], 
-      });
-    } catch (error) {
-      console.log('Erro ao realizar logout:', error);
-    }
-  };
+  const primeiroNome = usuario?.nome?.trim().split(/\s+/)[0] ?? '';
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 0 }}>
-        
-        {/* Topo / Header do Drawer */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.logoText}>Decora+</Text>
-            <Text style={styles.subtitleText}>
-              {usuario.tipo ? `Painel de ${usuario.tipo.toLowerCase()}` : 'Painel do Usuário'}
-            </Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => props.navigation.closeDrawer()}
-          >
-            <Feather name="x" size={22} color="#6C757D" />
-          </TouchableOpacity>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.logo}>Decora+</Text>
+          <Text style={styles.subtitulo}>Painel de Professor</Text>
         </View>
+        <TouchableOpacity onPress={() => props.navigation.closeDrawer()} hitSlop={10}>
+          <Feather name="x" size={24} color="#495057" />
+        </TouchableOpacity>
+      </View>
 
-        {/* Lista das Rotas/Links */}
-        <View style={styles.itemListContainer}>
-          <DrawerItemList {...props} />
-        </View>
-
+      <DrawerContentScrollView {...props} contentContainerStyle={styles.scroll}>
+        <DrawerItemList {...props} />
       </DrawerContentScrollView>
 
-      {/* Rodapé fixo com Perfil do Usuário e Logout */}
       <View style={styles.footer}>
-        {loading ? (
-          <ActivityIndicator size="small" color="#155DFC" style={{ flex: 1 }} />
-        ) : (
-          <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{obterIniciais(usuario.nome)}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {usuario.nome || 'Usuário'}
-              </Text>
-              <Text style={styles.userEmail} numberOfLines={1}>
-                {usuario.email || 'email@exemplo.com'}
-              </Text>
-            </View>
+        <View style={styles.perfil}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarTexto}>
+              {usuario ? iniciais(usuario.nome) : ''}
+            </Text>
           </View>
-        )}
+          <View style={styles.perfilTextos}>
+            <Text style={styles.nome} numberOfLines={1}>
+              {usuario ? `Prof. ${primeiroNome}` : ''}
+            </Text>
+            <Text style={styles.email} numberOfLines={1}>
+              {usuario?.email ?? ''}
+            </Text>
+          </View>
+        </View>
 
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <Feather name="log-out" size={20} color="#6C757D" />
+        <TouchableOpacity style={styles.sair} onPress={confirmarSaida} hitSlop={10}>
+          <Feather name="log-out" size={24} color="#495057" />
         </TouchableOpacity>
       </View>
     </View>
@@ -116,73 +82,38 @@ export function CustomDrawerContent(props: DrawerContentComponentProps) {
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
+    paddingTop: 48,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F3F5',
+    borderBottomColor: '#E9ECEF',
   },
-  logoText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#155DFC',
-  },
-  subtitleText: {
-    fontSize: 13,
-    color: '#6C757D',
-    marginTop: 2,
-    textTransform: 'capitalize',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  itemListContainer: {
-    paddingTop: 12,
-    paddingHorizontal: 8,
-  },
+  logo: { fontSize: 28, fontWeight: 'bold', color: '#155DFC' },
+  subtitulo: { fontSize: 14, color: '#868E96', marginTop: 2 },
+  scroll: { paddingTop: 16, paddingHorizontal: 8 },
   footer: {
     borderTopWidth: 1,
-    borderTopColor: '#F1F3F5',
-    paddingHorizontal: 16,
+    borderTopColor: '#E9ECEF',
+    paddingHorizontal: 20,
     paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
   },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+  perfil: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#D0EBFF',
-    alignItems: 'center',
+    backgroundColor: '#BAD0FF',
     justifyContent: 'center',
-    marginRight: 10,
+    alignItems: 'center',
   },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#155DFC',
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  userEmail: {
-    fontSize: 11,
-    color: '#868E96',
-  },
-  logoutButton: {
-    padding: 8,
-  },
+  avatarTexto: { color: '#155DFC', fontWeight: 'bold', fontSize: 14 },
+  perfilTextos: { marginLeft: 12, flex: 1 },
+  nome: { fontSize: 14, fontWeight: 'bold', color: '#212529' },
+  email: { fontSize: 13, color: '#212529' },
+  sair: { alignSelf: 'flex-end', marginTop: 12 },
 });

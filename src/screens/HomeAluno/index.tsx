@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,70 +6,76 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  RefreshControl,
+  StyleSheet,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { CardMateria } from '../../components/CardMateria/CardMateria';
-import { SecaoIngressarSala } from '../../components/SecaoIngressarSala'; // Ajuste o caminho da importação
-import { api } from '../../services/api'; 
+import { SecaoIngressarSala } from '../../components/SecaoIngressarSala';
+import { api } from '../../services/api';
+import { salaService } from '../../services/sala';
 import { styles } from './styles';
+
+type SalaAluno = {
+  id: number;
+  nome: string;
+  disciplina: string;
+  ano: number;
+  professorNome?: string | null;
+};
+
+const CORES = ['#FF922B', '#15AABF', '#CC5DE8', '#51CF66', '#FF6B6B', '#339AF0'];
 
 export function HomeAluno() {
   const [loading, setLoading] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
   const [nomeUsuario, setNomeUsuario] = useState('');
   const [streak, setStreak] = useState(0);
   const [xp, setXp] = useState(0);
+  const [salas, setSalas] = useState<SalaAluno[]>([]);
 
-  // Lista mockada de matérias para renderização
-  const materias = [
-    {
-      id: '1',
-      nome: 'Estrutura de dados',
-      cursoSemestre: '2º Semestre - ADS',
-      cardsParaRevisar: 12,
-      iconName: 'database' as const,
-      iconBgColor: '#FF922B',
-    },
-    {
-      id: '2',
-      nome: 'Algoritmos',
-      cursoSemestre: '2º Semestre - ADS',
-      cardsParaRevisar: 24,
-      iconName: 'code' as const,
-      iconBgColor: '#15AABF',
-    },
-    {
-      id: '3',
-      nome: 'Inglês V',
-      cursoSemestre: '2º Semestre - ADS',
-      cardsParaRevisar: 2,
-      iconName: 'flag' as const,
-      iconBgColor: '#CC5DE8',
-    },
-  ];
-
-  // Busca as informações do aluno autenticado no Spring Boot
-  const carregarDadosAluno = async () => {
+  // Somente as salas em que o aluno logado está vinculado (GET /salas/minhas)
+  const carregarSalas = useCallback(async () => {
     try {
-      setLoading(true);
+      const lista = await salaService.listarMinhasSalas();
+      setSalas(lista);
+    } catch (error: any) {
+      console.log('Erro ao carregar salas do aluno:', error);
+      Alert.alert(
+        'Erro',
+        error.response?.data?.mensagem || 'Não foi possível carregar suas salas.'
+      );
+    }
+  }, []);
+
+  const carregarTudo = useCallback(async () => {
+    try {
       const response = await api.get('/usuarios/me');
-      
       setNomeUsuario(response.data.nome || 'Aluno');
-      setStreak(response.data.ofensiva || response.data.streak || 0); 
+      setStreak(response.data.ofensiva || response.data.streak || 0);
       setXp(response.data.xp || 0);
     } catch (error: any) {
       console.log('Erro ao carregar dados do aluno:', error);
       Alert.alert(
         'Erro',
-        error.response?.data?.message || 'Não foi possível carregar as informações do perfil.'
+        error.response?.data?.mensagem || 'Não foi possível carregar as informações do perfil.'
       );
-    } finally {
-      setLoading(false);
     }
-  };
+    await carregarSalas();
+  }, [carregarSalas]);
 
   useEffect(() => {
-    carregarDadosAluno();
-  }, []);
+    (async () => {
+      setLoading(true);
+      await carregarTudo();
+      setLoading(false);
+    })();
+  }, [carregarTudo]);
+
+  const aoPuxarParaAtualizar = async () => {
+    setAtualizando(true);
+    await carregarTudo();
+    setAtualizando(false);
+  };
 
   if (loading) {
     return (
@@ -81,9 +87,13 @@ export function HomeAluno() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* Topo / Header com XP e Ofensiva dinâmicos */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={atualizando} onRefresh={aoPuxarParaAtualizar} />
+        }
+      >
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Olá, {nomeUsuario}!</Text>
@@ -101,32 +111,84 @@ export function HomeAluno() {
           </View>
         </View>
 
-        {/* Seção das Matérias */}
         <Text style={styles.sectionTitle}>Suas matérias</Text>
         <Text style={styles.sectionSubtitle}>
-          Continue aprendendo e fortalecendo sua memória.
+          Estas são as salas em que você está matriculado.
         </Text>
 
-        {materias.map((item) => (
-          <CardMateria
-            key={item.id}
-            nome={item.nome}
-            cursoSemestre={item.cursoSemestre}
-            cardsParaRevisar={item.cardsParaRevisar}
-            iconName={item.iconName}
-            iconBgColor={item.iconBgColor}
-            onPress={() => console.log(`Abrir matéria: ${item.nome}`)}
-          />
-        ))}
+        {salas.length === 0 ? (
+          <View style={local.vazio}>
+            <MaterialCommunityIcons name="school-outline" size={40} color="#ADB5BD" />
+            <Text style={local.vazioTitulo}>Nenhuma sala por aqui</Text>
+            <Text style={local.vazioTexto}>
+              Peça o código ao seu professor e entre em uma sala abaixo.
+            </Text>
+          </View>
+        ) : (
+          salas.map((sala, index) => (
+            <TouchableOpacity
+              key={sala.id}
+              activeOpacity={0.85}
+              style={local.card}
+              onPress={() => console.log(`Abrir sala: ${sala.nome}`)}
+            >
+              <View style={[local.icone, { backgroundColor: CORES[index % CORES.length] }]}>
+                <MaterialCommunityIcons name="school" size={26} color="#FFFFFF" />
+              </View>
 
-        <TouchableOpacity style={styles.seeMoreButton}>
-          <Text style={styles.seeMoreText}>Ver todas matérias</Text>
-        </TouchableOpacity>
+              <View style={local.textos}>
+                <Text style={local.nome} numberOfLines={1}>{sala.nome}</Text>
+                <Text style={local.detalhe} numberOfLines={1}>
+                  {sala.disciplina} • {sala.ano}
+                </Text>
+                {!!sala.professorNome && (
+                  <Text style={local.detalhe} numberOfLines={1}>
+                    Prof. {sala.professorNome}
+                  </Text>
+                )}
+              </View>
 
-        {/* Componente Modular de Ingressar em Sala */}
-        <SecaoIngressarSala />
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#ADB5BD" />
+            </TouchableOpacity>
+          ))
+        )}
 
+        {/* Ao ingressar, a lista de salas é recarregada */}
+        <SecaoIngressarSala onIngressou={carregarSalas} />
       </ScrollView>
     </View>
   );
 }
+
+const local = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+    padding: 14,
+    marginBottom: 12,
+  },
+  icone: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  textos: { flex: 1, marginHorizontal: 12 },
+  nome: { fontSize: 16, fontWeight: 'bold', color: '#212529' },
+  detalhe: { fontSize: 13, color: '#868E96', marginTop: 2 },
+  vazio: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  vazioTitulo: { fontSize: 16, fontWeight: 'bold', color: '#495057', marginTop: 10 },
+  vazioTexto: { fontSize: 13, color: '#868E96', textAlign: 'center', marginTop: 4 },
+});

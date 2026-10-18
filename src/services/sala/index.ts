@@ -52,4 +52,9 @@ export const salaService = {
   excluirSala: async (id: number): Promise<void> => {
     await api.delete(`/salas/${id}`);
   },
+
+  listarMinhasSalas: async () => {
+     const { data } = await api.get('/salas/minhas');
+     return data;
+   },
 };

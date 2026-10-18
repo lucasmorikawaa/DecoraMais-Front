@@ -4,7 +4,15 @@ import {
 } from 'react-native';
 import { salaService } from '../../services/sala';
 
-type SalaDTO = Awaited<ReturnType<typeof salaService.buscarSalaPorCodigo>>;
+type SalaDTO = {
+  id: number;
+  nome: string;
+  disciplina: string;
+  ano: number;
+  codigConvite: string;
+  professorNome?: string | null;
+  quantidadeAlunos?: number | null;
+};
 
 type Props = { onIngressou?: (sala: SalaDTO) => void };
 
@@ -20,14 +28,14 @@ export function SecaoIngressarSala({ onIngressou }: Props) {
   const [erro, setErro] = useState('');
   const [buscando, setBuscando] = useState(false);
   const [ingressando, setIngressando] = useState(false);
-  const [ingressou, setIngressou] = useState(false);
 
   const buscar = async () => {
     const c = codigo.trim().toUpperCase();
     if (!c) { setErro('Digite o código da sala'); setSala(null); return; }
-    setBuscando(true); setErro(''); setSala(null); setIngressou(false);
+    setBuscando(true); setErro(''); setSala(null);
     try {
-      setSala(await salaService.buscarSalaPorCodigo(c));
+      const resultado = await salaService.buscarSalaPorCodigo(c);
+      setSala(resultado as unknown as SalaDTO);
     } catch (e) {
       setErro(extrairErro(e));
     } finally {
@@ -37,16 +45,24 @@ export function SecaoIngressarSala({ onIngressou }: Props) {
 
   const ingressar = () => {
     if (!sala) return;
-    Alert.alert('Ingressar', `Deseja entrar na sala "${sala.nome}"?`, [
+    const salaEscolhida = sala;
+
+    Alert.alert('Ingressar', `Deseja entrar na sala "${salaEscolhida.nome}"?`, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Ingressar',
         onPress: async () => {
           setIngressando(true);
           try {
-            await salaService.ingressarNaSala(sala.codigConvite);
-            setIngressou(true);
-            onIngressou?.(sala);
+            await salaService.ingressarNaSala(salaEscolhida.codigConvite);
+
+            // Faz o card de resultado sumir e limpa o campo
+            setSala(null);
+            setCodigo('');
+            setErro('');
+
+            onIngressou?.(salaEscolhida);
+            Alert.alert('Tudo certo!', `Você entrou na sala "${salaEscolhida.nome}".`);
           } catch (e: any) {
             Alert.alert('Erro', e?.response?.data?.mensagem || 'Não foi possível ingressar.');
           } finally {
@@ -89,15 +105,15 @@ export function SecaoIngressarSala({ onIngressou }: Props) {
           {sala.quantidadeAlunos != null && (
             <Text style={styles.cardText}>{sala.quantidadeAlunos} aluno(s)</Text>
           )}
-          {ingressou ? (
-            <Text style={styles.ok}>Você está nesta sala ✓</Text>
-          ) : (
-            <TouchableOpacity style={[styles.button, styles.full]} onPress={ingressar} disabled={ingressando}>
-              {ingressando
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.buttonText}>Ingressar nesta sala</Text>}
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.button, styles.full]}
+            onPress={ingressar}
+            disabled={ingressando}
+          >
+            {ingressando
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.buttonText}>Ingressar nesta sala</Text>}
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -119,5 +135,4 @@ const styles = StyleSheet.create({
   card: { marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E9ECEF' },
   cardTitle: { fontSize: 16, fontWeight: 'bold', color: '#212529' },
   cardText: { fontSize: 13, color: '#495057', marginTop: 4 },
-  ok: { marginTop: 12, color: '#2F9E44', fontWeight: '600' },
 });

@@ -14,6 +14,7 @@ import { SecaoIngressarSala } from '../../components/SecaoIngressarSala';
 import { api } from '../../services/api';
 import { salaService } from '../../services/sala';
 import { styles } from './styles';
+import { SessaoFlashcards } from '../FlashCardRevisao';
 
 type SalaAluno = {
   id: number;
@@ -32,6 +33,7 @@ export function HomeAluno() {
   const [streak, setStreak] = useState(0);
   const [xp, setXp] = useState(0);
   const [salas, setSalas] = useState<SalaAluno[]>([]);
+  const [salaEstudo, setSalaEstudo] = useState<SalaAluno | null>(null);
 
   // Somente as salas em que o aluno logado está vinculado (GET /salas/minhas)
   const carregarSalas = useCallback(async () => {
@@ -77,12 +79,23 @@ export function HomeAluno() {
     setAtualizando(false);
   };
 
+  // Fecha a sessão e atualiza XP e ofensiva
+  const fecharEstudo = () => {
+    setSalaEstudo(null);
+    carregarTudo();
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color="#155DFC" />
       </View>
     );
+  }
+
+  // Sessão de flashcards da sala escolhida
+  if (salaEstudo) {
+    return <SessaoFlashcards sala={salaEstudo} onFechar={fecharEstudo} />;
   }
 
   return (
@@ -130,7 +143,7 @@ export function HomeAluno() {
               key={sala.id}
               activeOpacity={0.85}
               style={local.card}
-              onPress={() => console.log(`Abrir sala: ${sala.nome}`)}
+              onPress={() => setSalaEstudo(sala)}
             >
               <View style={[local.icone, { backgroundColor: CORES[index % CORES.length] }]}>
                 <MaterialCommunityIcons name="school" size={26} color="#FFFFFF" />

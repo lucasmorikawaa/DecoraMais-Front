@@ -13,6 +13,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { salaService } from '../../services/sala';
 import { styles } from './styles';
 import { TodasMateriasScreenProps } from './types';
+import { SessaoFlashcards } from '../FlashCardRevisao';
 
 type SalaAluno = {
   id: number;
@@ -28,6 +29,7 @@ export function TodasMateriasScreen({ onSelectMateria }: TodasMateriasScreenProp
   const [salas, setSalas] = useState<SalaAluno[]>([]);
   const [loading, setLoading] = useState(true);
   const [atualizando, setAtualizando] = useState(false);
+  const [salaEstudo, setSalaEstudo] = useState<SalaAluno | null>(null);
 
   // Somente as salas em que o aluno logado está vinculado (GET /salas/minhas)
   const carregarSalas = useCallback(async () => {
@@ -65,6 +67,11 @@ export function TodasMateriasScreen({ onSelectMateria }: TodasMateriasScreenProp
     );
   }
 
+  // Sessão de flashcards da sala escolhida
+  if (salaEstudo) {
+    return <SessaoFlashcards sala={salaEstudo} onFechar={() => setSalaEstudo(null)} />;
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Suas matérias</Text>
@@ -76,7 +83,10 @@ export function TodasMateriasScreen({ onSelectMateria }: TodasMateriasScreenProp
           <TouchableOpacity
             activeOpacity={0.85}
             style={local.card}
-            onPress={() => onSelectMateria?.(String(item.id))}
+            onPress={() => {
+              setSalaEstudo(item);
+              onSelectMateria?.(String(item.id));
+            }}
           >
             <View style={[local.icone, { backgroundColor: CORES[index % CORES.length] }]}>
               <MaterialCommunityIcons name="school" size={26} color="#FFFFFF" />

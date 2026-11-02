@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TextInput,
   TouchableOpacity,
@@ -10,9 +11,10 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Stepper } from "../../components/Stepper/Stepper";
+import { SeletorImagem } from "../../components/SeletorImagem";
 import { salaService } from "../../services/sala";
 import { SalaDTO } from "../../services/sala/types";
-import { flashcardService } from "../../services/flashcard";
+import { flashcardService, urlImagem } from "../../services/flashcard";
 import { FlashcardDTO, FlashcardPayload } from "../../services/flashcard/types";
 import { styles } from "./styles";
 
@@ -60,7 +62,7 @@ export function BancoDeCards() {
   // Etapa 1: dados do card
   const [frente, setFrente] = useState("");
   const [verso, setVerso] = useState("");
-  const [imagemUrl, setImagemUrl] = useState("");
+  const [imagem, setImagem] = useState<string | null>(null); // caminho salvo no servidor
   const [dataDisponibilidade, setDataDisponibilidade] = useState("");
 
   // Etapa 2: salas reais do backend
@@ -133,7 +135,7 @@ export function BancoDeCards() {
     const payload: FlashcardPayload = {
       pergunta: frente.trim(),
       resposta: verso.trim(),
-      imagem: imagemUrl.trim() || undefined,
+      imagem: imagem ?? undefined,
       dataDisponibilidade: dataBrParaISO(dataDisponibilidade) ?? undefined,
       salaIds: salasSelecionadas,
     };
@@ -168,7 +170,7 @@ export function BancoDeCards() {
   const handleCriarOutro = () => {
     setFrente("");
     setVerso("");
-    setImagemUrl("");
+    setImagem(null);
     setDataDisponibilidade("");
     setSalasSelecionadas([]);
     setCardSalvo(null);
@@ -176,11 +178,14 @@ export function BancoDeCards() {
     setStep(1);
   };
 
+  const imagemPreview = urlImagem(cardSalvo?.imagem);
+
   return (
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.headerTitle}>Banco de Cards</Text>
         <Text style={styles.headerSubtitle}>
@@ -218,17 +223,7 @@ export function BancoDeCards() {
                 onChangeText={setVerso}
               />
 
-              <Text style={styles.label}>Imagem (Opcional)</Text>
-              <View style={styles.inputWithIcon}>
-                <TextInput
-                  style={styles.flexInput}
-                  placeholder="URL da imagem..."
-                  autoCapitalize="none"
-                  value={imagemUrl}
-                  onChangeText={setImagemUrl}
-                />
-                <Feather name="image" size={20} color="#6C757D" />
-              </View>
+              <SeletorImagem value={imagem} onChange={setImagem} />
 
               <Text style={[styles.label, { marginTop: 12 }]}>
                 Data de disponibilidade (Opcional)
@@ -364,6 +359,24 @@ export function BancoDeCards() {
 
                 <Text style={styles.previewLabel}>Verso:</Text>
                 <Text style={styles.previewText}>{cardSalvo.resposta}</Text>
+
+                {imagemPreview && (
+                  <>
+                    <Text style={styles.previewLabel}>Imagem:</Text>
+                    <Image
+                      source={{ uri: imagemPreview }}
+                      style={{
+                        width: "100%",
+                        height: 140,
+                        borderRadius: 8,
+                        marginTop: 4,
+                        marginBottom: 8,
+                        backgroundColor: "#E9ECEF",
+                      }}
+                      resizeMode="cover"
+                    />
+                  </>
+                )}
 
                 <Text style={styles.previewLabel}>Disponível a partir de:</Text>
                 <Text style={styles.previewText}>

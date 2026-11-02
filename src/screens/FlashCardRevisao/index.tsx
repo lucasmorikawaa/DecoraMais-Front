@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { flashcardService } from '../../services/flashcard';
+import { flashcardService, urlImagem } from '../../services/flashcard';
 import { FlashcardDTO } from '../../services/flashcard/types';
 
 type Props = {
@@ -30,6 +30,7 @@ export function SessaoFlashcards({ sala, onFechar }: Props) {
   const [virado, setVirado] = useState(false);
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
+  const [imagemComErro, setImagemComErro] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -127,7 +128,12 @@ export function SessaoFlashcards({ sala, onFechar }: Props) {
   }
 
   const progresso = (indice / total) * 100;
-  const temImagem = !!card.imagem && card.imagem.startsWith('http');
+
+  // Monta a URL completa a partir do caminho salvo pelo back (ex.: "/uploads/abc.jpg")
+  const imagemUri = urlImagem(card.imagem);
+
+  // DIAGNÓSTICO (pode apagar depois que funcionar)
+  console.log('card', card.id, 'imagem:', card.imagem, '->', imagemUri);
 
   return (
     <View style={styles.container}>
@@ -147,13 +153,33 @@ export function SessaoFlashcards({ sala, onFechar }: Props) {
         </Text>
 
         <View style={styles.cardCorpo}>
-          {temImagem && (
-            <Image source={{ uri: card.imagem! }} style={styles.imagem} resizeMode="contain" />
-          )}
           {virado ? (
             <Text style={styles.resposta}>{card.resposta}</Text>
           ) : (
             <>
+              {imagemUri && imagemComErro !== imagemUri && (
+                <Image
+                  key={imagemUri}
+                  source={{ uri: imagemUri }}
+                  style={styles.imagem}
+                  resizeMode="contain"
+                  onError={(e) => {
+                    console.log(
+                      'Erro ao carregar imagem:',
+                      imagemUri,
+                      e.nativeEvent?.error
+                    );
+                    setImagemComErro(imagemUri);
+                  }}
+                />
+              )}
+
+              {imagemUri && imagemComErro === imagemUri && (
+                <Text style={styles.erroImagem}>
+                  Não foi possível carregar a imagem{'\n'}({imagemUri})
+                </Text>
+              )}
+
               <Text style={styles.pergunta}>{card.pergunta}</Text>
               <Text style={styles.dica}>Toque para ver a resposta</Text>
             </>
@@ -168,7 +194,11 @@ export function SessaoFlashcards({ sala, onFechar }: Props) {
               key={op.nota}
               activeOpacity={0.85}
               disabled={enviando}
-              style={[styles.opcao, { backgroundColor: op.cor }, enviando && styles.opcaoDesabilitada]}
+              style={[
+                styles.opcao,
+                { backgroundColor: op.cor },
+                enviando && styles.opcaoDesabilitada,
+              ]}
               onPress={() => avaliar(op.nota)}
             >
               <Feather name={op.icone} size={24} color="#FFFFFF" />
@@ -203,7 +233,7 @@ const styles = StyleSheet.create({
   barraPreenchida: { height: 8, borderRadius: 4, backgroundColor: '#155DFC' },
 
   card: {
-    height: 300,
+    minHeight: 300,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#CED4DA',
@@ -215,11 +245,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     paddingHorizontal: 20,
     paddingTop: 8,
+    paddingBottom: 16,
   },
   cardRotulo: { textAlign: 'center', fontSize: 13, fontWeight: '600', color: '#868E96' },
   cardRotuloResposta: { color: '#15AABF' },
   cardCorpo: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  imagem: { width: '100%', height: 100, marginBottom: 12 },
+  imagem: { width: '100%', height: 130, marginBottom: 12, borderRadius: 8 },
+  erroImagem: { fontSize: 11, color: '#E03131', textAlign: 'center', marginBottom: 10 },
   pergunta: { fontSize: 17, fontWeight: 'bold', color: '#212529', textAlign: 'center' },
   dica: { fontSize: 13, color: '#868E96', marginTop: 8 },
   resposta: { fontSize: 15, color: '#212529', textAlign: 'center', lineHeight: 22 },

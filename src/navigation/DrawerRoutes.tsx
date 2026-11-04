@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { Feather } from '@expo/vector-icons';
@@ -81,9 +80,9 @@ export function DrawerRoutes({ onLogout }: DrawerRoutesProps) {
         }}
       />
 
+      {/* Usa o formato de função para repassar o onLogout à tela */}
       <Drawer.Screen
         name="Configuracoes"
-        component={Configuracoes}
         options={{
           drawerLabel: 'Configurações',
           title: '',
@@ -91,7 +90,9 @@ export function DrawerRoutes({ onLogout }: DrawerRoutesProps) {
             <Feather name="settings" size={size} color={color} />
           ),
         }}
-      />
+      >
+        {() => <Configuracoes onLogout={onLogout} />}
+      </Drawer.Screen>
     </Drawer.Navigator>
   );
 }

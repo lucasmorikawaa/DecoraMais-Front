@@ -14,6 +14,8 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../../services/api';
 import { authService } from '../../services/auth';
+import { MedidorSenha } from '../../components/MedidorSenha';
+import { avaliarSenha, EXIGIR_SENHA_FORTE } from '../../utils/senhaForte';
 
 type TipoConta = 'ALUNO' | 'PROFESSOR';
 
@@ -47,6 +49,7 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
   const [erro, setErro] = useState('');
 
   const ehProfessor = tipo === 'PROFESSOR';
+  const senhaForte = avaliarSenha(senha).forte;
 
   const limparErro = () => { if (erro) setErro(''); };
 
@@ -62,6 +65,13 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
       setErro('Informe um e-mail válido.');
       return;
     }
+    if (!senhaForte) {
+      setErro(
+        'Senha fraca: use no mínimo 8 caracteres, com letra maiúscula, minúscula, número e caractere especial.'
+      );
+      return;
+    }
+    // Regra mínima que continua valendo mesmo com a senha forte desligada
     if (senha.length < 6) {
       setErro('A senha deve ter pelo menos 6 caracteres.');
       return;
@@ -95,6 +105,8 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
       setLoading(false);
     }
   };
+
+  const botaoBloqueado = loading || !senhaForte;
 
   return (
     <KeyboardAvoidingView
@@ -155,7 +167,7 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
           <Feather name="lock" size={20} color="#6C757D" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
-            placeholder="Mínimo de 6 caracteres"
+            placeholder={EXIGIR_SENHA_FORTE ? 'Mínimo de 8 caracteres' : 'Mínimo de 6 caracteres'}
             placeholderTextColor="#ADB5BD"
             secureTextEntry={!showPassword}
             autoCapitalize="none"
@@ -168,6 +180,9 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
             <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color="#6C757D" />
           </TouchableOpacity>
         </View>
+
+        {/* Barra de força e lista de requisitos (aparece ao digitar) */}
+        {EXIGIR_SENHA_FORTE && <MedidorSenha senha={senha} />}
 
         <Text style={styles.label}>Confirmar senha *</Text>
         <View style={styles.inputContainer}>
@@ -188,9 +203,9 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
         </View>
 
         <TouchableOpacity
-          style={[styles.botao, loading && styles.botaoDesabilitado]}
+          style={[styles.botao, botaoBloqueado && styles.botaoDesabilitado]}
           onPress={handleCadastrar}
-          disabled={loading}
+          disabled={botaoBloqueado}
           activeOpacity={0.8}
         >
           {loading ? (

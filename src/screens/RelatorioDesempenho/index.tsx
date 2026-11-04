@@ -1,15 +1,14 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   StyleSheet,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Feather } from '@expo/vector-icons';
 import { salaService } from '../../services/sala';
 import {
@@ -48,50 +47,68 @@ export function RelatorioDesempenho() {
   const [relatorio, setRelatorio] =
     useState<RelatorioTurma | null>(null);
   const [listaAberta, setListaAberta] = useState(false);
-  const [busca, setBusca] = useState('');
   const [loadingSalas, setLoadingSalas] = useState(true);
   const [loadingRelatorio, setLoadingRelatorio] = useState(false);
 
   // Carrega as salas do professor logado
-  useEffect(() => {
-    (async () => {
-      try {
-        const lista = await salaService.listarMinhasSalas();
-
-        setSalas(lista);
-
-        if (lista.length > 0) {
-          setSalaSelecionada(lista[0]);
-        }
-      } catch (e) {
-        Alert.alert('Erro', extrairErro(e));
-      } finally {
-        setLoadingSalas(false);
-      }
-    })();
-  }, []);
-
-  // Busca o relatório da sala selecionada
-  const carregarRelatorio = useCallback(async (sala: Sala) => {
-    setLoadingRelatorio(true);
-
+  const carregarSalas = useCallback(async () => {
     try {
-      setRelatorio(
-        await relatorioService.obterRelatorioTurma(sala.id)
+      const lista =
+        (await salaService.listarMinhasSalas()) as unknown as Sala[];
+
+      setSalas(lista);
+
+      // Mantém a sala escolhida se ela ainda existir; senão usa a primeira
+      setSalaSelecionada(
+        (atual) =>
+          lista.find((s) => s.id === atual?.id) ?? lista[0] ?? null
       );
     } catch (e) {
-      setRelatorio(null);
       Alert.alert('Erro', extrairErro(e));
     } finally {
-      setLoadingRelatorio(false);
+      setLoadingSalas(false);
     }
   }, []);
 
+  // Recarrega as salas toda vez que a tela ganha foco
+  // (assim, salas criadas depois de abrir o relatório também aparecem)
+  useFocusEffect(
+    useCallback(() => {
+      carregarSalas();
+    }, [carregarSalas])
+  );
+
+  // Busca o relatório da sala selecionada
   useEffect(() => {
-    if (salaSelecionada) {
-      carregarRelatorio(salaSelecionada);
+    if (!salaSelecionada) {
+      setRelatorio(null);
+      return;
     }
-  }, [salaSelecionada, carregarRelatorio]);
+
+    let cancelado = false;
+    setLoadingRelatorio(true);
+
+    (async () => {
+      try {
+        const dados = await relatorioService.obterRelatorioTurma(
+          salaSelecionada.id
+        );
+        if (!cancelado) setRelatorio(dados);
+      } catch (e) {
+        if (!cancelado) {
+          setRelatorio(null);
+          Alert.alert('Erro', extrairErro(e));
+        }
+      } finally {
+        if (!cancelado) setLoadingRelatorio(false);
+      }
+    })();
+
+    // Descarta a resposta se o professor trocar de sala antes de ela chegar
+    return () => {
+      cancelado = true;
+    };
+  }, [salaSelecionada]);
 
   const semDados =
     !relatorio ||
@@ -104,19 +121,11 @@ export function RelatorioDesempenho() {
         relatorio!.mediaFatorFacilidade
       );
 
-  // Filtra e limita a exibição aos três cards mais difíceis
-  const cardsFiltrados = useMemo(() => {
-    const todos = relatorio?.cardsMaisDificeis ?? [];
-    const termo = busca.trim().toLowerCase();
-
-    const filtrados = termo
-      ? todos.filter((c) =>
-          c.pergunta.toLowerCase().includes(termo)
-        )
-      : todos;
-
-    return filtrados.slice(0, 3);
-  }, [relatorio, busca]);
+  // Limita a exibição aos três cards mais difíceis
+  const cardsMaisDificeis = useMemo(
+    () => (relatorio?.cardsMaisDificeis ?? []).slice(0, 3),
+    [relatorio]
+  );
 
   const rotuloSala = (s: Sala) =>
     `${s.ano} - ${s.disciplina} | ${s.nome}`;
@@ -133,7 +142,6 @@ export function RelatorioDesempenho() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.titulo}>
@@ -199,7 +207,6 @@ export function RelatorioDesempenho() {
                   onPress={() => {
                     setSalaSelecionada(s);
                     setListaAberta(false);
-                    setBusca('');
                   }}
                 >
                   <Text
@@ -212,24 +219,6 @@ export function RelatorioDesempenho() {
               ))}
             </View>
           )}
-
-          {/* Busca de cards */}
-          <View style={styles.busca}>
-            <Feather
-              name="search"
-              size={18}
-              color="#868E96"
-            />
-
-            <TextInput
-              style={styles.buscaInput}
-              placeholder="Buscar card..."
-              placeholderTextColor="#868E96"
-              value={busca}
-              onChangeText={setBusca}
-              autoCorrect={false}
-            />
-          </View>
 
           {loadingRelatorio ? (
             <ActivityIndicator
@@ -287,14 +276,12 @@ export function RelatorioDesempenho() {
                   desta sala — considere revisar em aula.
                 </Text>
 
-                {cardsFiltrados.length === 0 ? (
+                {cardsMaisDificeis.length === 0 ? (
                   <Text style={styles.semCards}>
-                    {busca
-                      ? 'Nenhum card encontrado para essa busca.'
-                      : 'Ainda não há revisões dos alunos nesta sala.'}
+                    Ainda não há revisões dos alunos nesta sala.
                   </Text>
                 ) : (
-                  cardsFiltrados.map((card, index) => (
+                  cardsMaisDificeis.map((card, index) => (
                     <View
                       key={card.cardId}
                       style={styles.cardDificil}
@@ -390,21 +377,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#EDF2FF',
   },
   listaTexto: {
-    fontSize: 14,
-    color: '#212529',
-  },
-  busca: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#E9ECEF',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 48,
-    marginTop: 12,
-  },
-  buscaInput: {
-    flex: 1,
     fontSize: 14,
     color: '#212529',
   },

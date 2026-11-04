@@ -12,6 +12,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "../../services/api";
 import { SettingsCard } from "../../components/ConfiguracaoCard/ConfiguracaoCard";
 import { styles } from "./styles";
+import { BotaoSair } from "../../components/BotaoSair";
+
+type Props = {
+  onLogout: () => void;
+};
 
 // O backend retorna erros como { status, mensagem } (em português).
 // Essa função pega a mensagem certa, com um texto padrão caso não exista.
@@ -19,7 +24,7 @@ function extrairMensagemErro(error: any, padrao: string): string {
   return error.response?.data?.mensagem || padrao;
 }
 
-export function Configuracoes() {
+export function Configuracoes({ onLogout }: Props) {
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [editandoPerfil, setEditandoPerfil] = useState(false);
@@ -304,7 +309,12 @@ export function Configuracoes() {
             )}
           </TouchableOpacity>
         </SettingsCard>
+
+        {/* Sair da conta (no final da tela) */}
+        <BotaoSair onLogout={onLogout} />
       </ScrollView>
     </View>
   );
 }
+
+export default Configuracoes;

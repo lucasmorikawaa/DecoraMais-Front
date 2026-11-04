@@ -9,7 +9,11 @@ import { Configuracoes } from "../screens/Configuracao";
 
 const Tab = createBottomTabNavigator();
 
-export function AlunoRoutes() {
+type Props = {
+  onLogout: () => void;
+};
+
+export function AlunoRoutes({ onLogout }: Props) {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -82,21 +86,27 @@ export function AlunoRoutes() {
         }}
       />
 
+      {/* A seta de voltar da loja leva de volta para a Home */}
       <Tab.Screen
         name="Loja"
-        component={LojaInsignias}
         options={{
           tabBarLabel: "Loja",
         }}
-      />
+      >
+        {({ navigation }) => (
+          <LojaInsignias onGoBack={() => navigation.navigate("Home")} />
+        )}
+      </Tab.Screen>
 
+      {/* Recebe o onLogout para o botão "Sair da conta" */}
       <Tab.Screen
         name="Perfil"
-        component={Configuracoes}
         options={{
           tabBarLabel: "Perfil",
         }}
-      />
+      >
+        {() => <Configuracoes onLogout={onLogout} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 }

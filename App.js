@@ -18,7 +18,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem("@DecoraPlus:token");
+      await AsyncStorage.multiRemove(["@DecoraPlus:token", "@DecoraPlus:user"]);
     } finally {
       setUsuarioLogado(null);
       setTelaAuth("login");
@@ -69,7 +69,7 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
-      <AlunoRoutes />
+      <AlunoRoutes onLogout={handleLogout} />
     </NavigationContainer>
   );
 }

@@ -1,15 +1,6 @@
 import { api } from "../api";
 import { CriarSalaPayload } from "./types";
-
-type SalaDTO = {
-  id: number;
-  nome: string;
-  disciplina: string;
-  ano: number;
-  codigConvite: string;
-  professorNome?: string | null;
-  quantidadeAlunos?: number | null;
-};
+import { SalaDTO } from "./types";
 
 export const salaService = {
   // GET: Busca todas as salas cadastradas do usuário logado

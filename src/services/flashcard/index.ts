@@ -37,6 +37,17 @@ export const flashcardService = {
     return response.data;
   },
 
+    // GET: todos os cards de uma sala
+  listarPorSala: async (salaId: number): Promise<FlashcardDTO[]> => {
+    const response = await api.get<FlashcardDTO[]>(`/flashcards/sala/${salaId}`);
+    return response.data;
+  },
+
+  // DELETE: exclui um card
+  excluirFlashcard: async (id: number): Promise<void> => {
+    await api.delete(`/flashcards/${id}`);
+  },
+
   // POST: envia a foto ao servidor e devolve o caminho público (ex.: "/uploads/abc.jpg")
   enviarImagem: async (
     uri: string,

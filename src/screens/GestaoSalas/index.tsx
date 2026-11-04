@@ -1,17 +1,31 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, FlatList, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  Alert,
+  TouchableOpacity,
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+
 import { BotaoCriarSala } from "../../components/Button/BotaoCriarSala/BotaoCriarSala";
 import { CardSala } from "../../components/CardSala/CardSala";
 import { ModalCriarSala } from "../../components/Modal/ModalCriarSala/ModalCriarSala";
 import { salaService } from "../../services/sala";
 import { SalaDTO } from "../../services/sala/types";
 import { styles } from "./styles";
+import { CardsDaSala } from "../CardsDaSala";
 
 export function GestaoSalas() {
   const [modalVisible, setModalVisible] = useState(false);
   const [salaEmEdicao, setSalaEmEdicao] = useState<SalaDTO | null>(null);
   const [salas, setSalas] = useState<SalaDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [salaCards, setSalaCards] = useState<{
+    id: number;
+    nome: string;
+  } | null>(null);
 
   // Busca as salas no Spring Boot ao montar o componente
   const carregarSalas = async () => {
@@ -95,11 +109,27 @@ export function GestaoSalas() {
     ]);
   };
 
+  // Abre a tela de cards da sala
+  const abrirCardsSala = (sala: SalaDTO) => {
+    setSalaCards({ id: sala.id, nome: sala.nome });
+  };
+
+  if (salaCards) {
+    return (
+      <CardsDaSala
+        sala={salaCards}
+        onFechar={() => setSalaCards(null)}
+      />
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.titleSection}>
         <Text style={styles.title}>Gestão de Salas</Text>
-        <Text style={styles.subtitle}>Gerencie suas turmas e disciplinas</Text>
+        <Text style={styles.subtitle}>
+          Gerencie suas turmas e disciplinas
+        </Text>
       </View>
 
       <BotaoCriarSala
@@ -111,7 +141,11 @@ export function GestaoSalas() {
 
       {loading ? (
         <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
         >
           <ActivityIndicator size="large" color="#155DFC" />
         </View>
@@ -120,23 +154,62 @@ export function GestaoSalas() {
           data={salas}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
-            <CardSala
-              id={String(item.id)}
-              periodo={item.nome}
-              materia={item.disciplina}
-              ano={String(item.ano)}
-              numAlunos={item.quantidadeAlunos}
-              codigoConvite={item.codigConvite}
-              onPressMenu={() => abrirOpcoesSala(item)}
-            />
+            <View>
+              <CardSala
+                id={String(item.id)}
+                periodo={item.nome}
+                materia={item.disciplina}
+                ano={String(item.ano)}
+                numAlunos={item.quantidadeAlunos}
+                codigoConvite={item.codigConvite}
+                onPressMenu={() => abrirOpcoesSala(item)}
+              />
+
+              {/* Botão Ver cards da sala */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  paddingVertical: 8,
+                  paddingHorizontal: 12,
+                  alignSelf: "flex-start",
+                }}
+                onPress={() => abrirCardsSala(item)}
+                activeOpacity={0.7}
+              >
+                <Feather
+                  name="layers"
+                  size={16}
+                  color="#155DFC"
+                />
+                <Text
+                  style={{
+                    color: "#155DFC",
+                    fontWeight: "600",
+                  }}
+                >
+                  Ver cards
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
-          contentContainerStyle={{ paddingBottom: 30, paddingTop: 10 }}
+          contentContainerStyle={{
+            paddingBottom: 30,
+            paddingTop: 10,
+          }}
           ListEmptyComponent={() => (
             <View style={{ alignItems: "center", marginTop: 40 }}>
               <Text style={{ color: "#868E96", fontSize: 14 }}>
                 Nenhuma sala cadastrada ainda.
               </Text>
-              <Text style={{ color: "#ADB5BD", fontSize: 12, marginTop: 4 }}>
+              <Text
+                style={{
+                  color: "#ADB5BD",
+                  fontSize: 12,
+                  marginTop: 4,
+                }}
+              >
                 Clique em "+ Criar Sala" para adicionar.
               </Text>
             </View>
@@ -156,7 +229,9 @@ export function GestaoSalas() {
         }}
         onSalaAtualizada={(salaAtualizada) => {
           setSalas((prev) =>
-            prev.map((s) => (s.id === salaAtualizada.id ? salaAtualizada : s)),
+            prev.map((s) =>
+              s.id === salaAtualizada.id ? salaAtualizada : s
+            ),
           );
         }}
       />

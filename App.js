@@ -9,10 +9,11 @@ import { LoginScreen } from "./src/screens/Login";
 import { AlunoRoutes } from "./src/navigation/AlunoRoutes";
 import { EscolherCriarConta } from "./src/screens/EscolherCriarConta";
 import { CriarConta } from "./src/screens/CriarConta";
+import { EsqueciSenha } from "./src/screens/EsqueciSenha";
 
 export default function App() {
   const [usuarioLogado, setUsuarioLogado] = useState(null);
-  // 'login' | 'escolherCriarConta' | 'criarConta'
+  // 'login' | 'escolherCriarConta' | 'criarConta' | 'esqueciSenha'
   const [telaAuth, setTelaAuth] = useState("login");
   const [tipoCadastro, setTipoCadastro] = useState(null);
 
@@ -27,6 +28,15 @@ export default function App() {
   };
 
   if (!usuarioLogado) {
+    if (telaAuth === "esqueciSenha") {
+      return (
+        <EsqueciSenha
+          onVoltar={() => setTelaAuth("login")}
+          onConcluir={() => setTelaAuth("login")}
+        />
+      );
+    }
+
     if (telaAuth === "criarConta" && tipoCadastro) {
       return (
         <CriarConta
@@ -53,6 +63,7 @@ export default function App() {
       <LoginScreen
         onLoginSuccess={(usuario) => setUsuarioLogado(usuario)}
         onNavigateToRegister={() => setTelaAuth("escolherCriarConta")}
+        onNavigateToForgot={() => setTelaAuth("esqueciSenha")}
       />
     );
   }

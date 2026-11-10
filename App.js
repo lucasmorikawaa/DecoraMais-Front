@@ -63,7 +63,7 @@ export default function App() {
       <LoginScreen
         onLoginSuccess={(usuario) => setUsuarioLogado(usuario)}
         onNavigateToRegister={() => setTelaAuth("escolherCriarConta")}
-        onNavigateToForgot={() => setTelaAuth("esqueciSenha")}
+        onNavigateToForgotPassword={() => setTelaAuth("esqueciSenha")}
       />
     );
   }

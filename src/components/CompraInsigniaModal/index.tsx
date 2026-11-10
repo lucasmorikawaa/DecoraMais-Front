@@ -8,7 +8,7 @@ import {
   Easing,
   StyleSheet,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { InsigniaVisual } from '../InsigniaVisual';
 
 export type InsigniaComprada = {
   nome: string;
@@ -16,6 +16,7 @@ export type InsigniaComprada = {
   icone?: string; // nome de um ícone Feather (ex.: 'award', 'star', 'zap')
   raridade?: 'comum' | 'rara' | 'epica' | 'lendaria';
   custo?: number;
+  cor?: string; // cor principal da insígnia
 };
 
 type Props = {
@@ -191,16 +192,15 @@ export function CompraInsigniaModal({ visible, insignia, onFechar, onEquipar }: 
 
           {/* Insígnia */}
           <Animated.View
-            style={[
-              styles.insignia,
-              {
-                borderColor: raridade.cor,
-                shadowColor: raridade.cor,
-                transform: [{ scale: escala }, { rotate: rotInsignia }],
-              },
-            ]}
+            style={{ transform: [{ scale: escala }, { rotate: rotInsignia }] }}
           >
-            <Feather name={(insignia.icone as any) || 'award'} size={64} color={raridade.cor} />
+            <InsigniaVisual
+              iconName={insignia.icone || 'award'}
+              cor={insignia.cor || raridade.cor}
+              raridade={insignia.raridade ?? 'comum'}
+              tamanho={150}
+              semRaios
+            />
           </Animated.View>
         </View>
 
@@ -275,19 +275,6 @@ const styles = StyleSheet.create({
     height: TAMANHO_BRILHO,
     borderRadius: 4,
     opacity: 0.22,
-  },
-  insignia: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 16,
-    shadowOpacity: 0.9,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 0 },
   },
   textos: { alignItems: 'center', marginTop: 8 },
   titulo: { fontSize: 14, fontWeight: '700', color: '#FFD43B', letterSpacing: 2, textTransform: 'uppercase' },

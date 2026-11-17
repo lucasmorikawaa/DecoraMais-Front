@@ -5,13 +5,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // Para emulador Android use: 'http://10.0.2.2:8080'
 // Para iOS / Expo Go no dispositivo físico use o IP local do seu PC: 'http://192.168.x.x:8080'
 export const api = axios.create({
-  baseURL: "http://192.168.15.6:8080",
+  baseURL: "",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
 });
-
 // Interceptor: Adiciona o Token JWT em todas as requisições autenticadas
 api.interceptors.request.use(
   async (config) => {

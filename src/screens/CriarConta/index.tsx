@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
   StyleSheet,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,6 +27,45 @@ type Props = {
 };
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Texto do termo de aceite (ajuste conforme as regras do seu projeto/instituição)
+const TERMOS: { titulo: string; texto: string }[] = [
+  {
+    titulo: '1. Sobre o Decora+',
+    texto:
+      'O Decora+ é uma plataforma de estudos baseada em flashcards e repetição espaçada. Professores criam salas e cards; alunos estudam e acompanham sua evolução.',
+  },
+  {
+    titulo: '2. Cadastro e conta',
+    texto:
+      'Para usar o aplicativo é preciso criar uma conta com informações verdadeiras. Você é responsável por manter sua senha em sigilo e por toda atividade realizada na sua conta. Avise-nos caso suspeite de uso indevido.',
+  },
+  {
+    titulo: '3. Uso adequado',
+    texto:
+      'É proibido usar o Decora+ para publicar conteúdo ofensivo, ilegal ou que viole direitos de terceiros, tentar acessar contas ou dados de outras pessoas, ou prejudicar o funcionamento do sistema.',
+  },
+  {
+    titulo: '4. Dados pessoais (LGPD)',
+    texto:
+      'Coletamos nome, e-mail, tipo de conta e dados de estudo (como cards revisados e desempenho) apenas para o funcionamento do aplicativo, como gerar relatórios para professores e controlar sua pontuação. Seus dados não são vendidos nem compartilhados com terceiros para fins comerciais. Você pode solicitar a correção ou a exclusão dos seus dados a qualquer momento.',
+  },
+  {
+    titulo: '5. Conteúdo e imagens',
+    texto:
+      'Os professores são responsáveis pelos cards e imagens que enviam, garantindo que têm o direito de usá-los. Conteúdo que viole estes termos poderá ser removido.',
+  },
+  {
+    titulo: '6. XP e insígnias',
+    texto:
+      'O XP e as insígnias são recursos de gamificação, não possuem valor monetário, não podem ser trocados por dinheiro e podem ser ajustados para manter o equilíbrio da plataforma.',
+  },
+  {
+    titulo: '7. Alterações',
+    texto:
+      'Estes termos podem ser atualizados. Quando houver mudanças relevantes, você será avisado no aplicativo.',
+  },
+];
 
 function extrairMensagemErro(error: any): string {
   if (!error?.response) {
@@ -47,6 +87,10 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
+
+  // Termo de aceite
+  const [aceitouTermos, setAceitouTermos] = useState(false);
+  const [mostrarTermos, setMostrarTermos] = useState(false);
 
   const ehProfessor = tipo === 'PROFESSOR';
   const senhaForte = avaliarSenha(senha).forte;
@@ -80,6 +124,10 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
       setErro('As senhas não conferem.');
       return;
     }
+    if (!aceitouTermos) {
+      setErro('Você precisa aceitar os Termos de Uso para criar a conta.');
+      return;
+    }
 
     setErro('');
     setLoading(true);
@@ -106,7 +154,8 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
     }
   };
 
-  const botaoBloqueado = loading || !senhaForte;
+  // O botão só libera com senha forte E termos aceitos
+  const botaoBloqueado = loading || !senhaForte || !aceitouTermos;
 
   return (
     <KeyboardAvoidingView
@@ -202,6 +251,29 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
           />
         </View>
 
+        {/* Termo de aceite (obrigatório) */}
+        <View style={styles.termosLinha}>
+          <TouchableOpacity
+            style={[styles.checkbox, aceitouTermos && styles.checkboxMarcado]}
+            onPress={() => { setAceitouTermos((v) => !v); limparErro(); }}
+            disabled={loading}
+            hitSlop={8}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: aceitouTermos }}
+            accessibilityLabel="Aceitar os Termos de Uso"
+          >
+            {aceitouTermos && <Feather name="check" size={16} color="#FFFFFF" />}
+          </TouchableOpacity>
+
+          <Text style={styles.termosTexto}>
+            Li e aceito os{' '}
+            <Text style={styles.termosLink} onPress={() => setMostrarTermos(true)}>
+              Termos de Uso e a Política de Privacidade
+            </Text>
+            . *
+          </Text>
+        </View>
+
         <TouchableOpacity
           style={[styles.botao, botaoBloqueado && styles.botaoDesabilitado]}
           onPress={handleCadastrar}
@@ -214,7 +286,60 @@ export function CriarConta({ tipo, onVoltar, onCadastroSuccess }: Props) {
             <Text style={styles.botaoTexto}>Criar conta</Text>
           )}
         </TouchableOpacity>
+
+        {!aceitouTermos && (
+          <Text style={styles.dicaTermos}>
+            Aceite os Termos de Uso para liberar o cadastro.
+          </Text>
+        )}
       </ScrollView>
+
+      {/* Modal com o texto completo dos termos */}
+      <Modal
+        visible={mostrarTermos}
+        animationType="slide"
+        onRequestClose={() => setMostrarTermos(false)}
+      >
+        <View style={styles.modal}>
+          <View style={styles.modalTopo}>
+            <Text style={styles.modalTitulo}>Termos de Uso</Text>
+            <TouchableOpacity onPress={() => setMostrarTermos(false)} hitSlop={10}>
+              <Feather name="x" size={26} color="#495057" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.modalCorpo} showsVerticalScrollIndicator>
+            <Text style={styles.modalIntro}>
+              Ao criar uma conta no Decora+, você concorda com as regras abaixo.
+            </Text>
+
+            {TERMOS.map((secao) => (
+              <View key={secao.titulo} style={{ marginBottom: 16 }}>
+                <Text style={styles.secaoTitulo}>{secao.titulo}</Text>
+                <Text style={styles.secaoTexto}>{secao.texto}</Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          <View style={styles.modalRodape}>
+            <TouchableOpacity
+              style={styles.botao}
+              activeOpacity={0.8}
+              onPress={() => {
+                setAceitouTermos(true);
+                limparErro();
+                setMostrarTermos(false);
+              }}
+            >
+              <Text style={styles.botaoTexto}>Li e aceito</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.botaoFechar} onPress={() => setMostrarTermos(false)}>
+              <Text style={styles.botaoFecharTexto}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -261,14 +386,64 @@ const styles = StyleSheet.create({
   inputIcon: { marginRight: 8 },
   input: { flex: 1, color: '#212529', fontSize: 15 },
   eyeIcon: { padding: 4 },
+
+  // Termo de aceite
+  termosLinha: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 22,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#ADB5BD',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  checkboxMarcado: { backgroundColor: '#155DFC', borderColor: '#155DFC' },
+  termosTexto: { flex: 1, fontSize: 14, color: '#495057', lineHeight: 20 },
+  termosLink: { color: '#155DFC', fontWeight: '600', textDecorationLine: 'underline' },
+  dicaTermos: { fontSize: 12, color: '#868E96', textAlign: 'center', marginTop: 10 },
+
   botao: {
     height: 52,
     borderRadius: 12,
     backgroundColor: '#155DFC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 28,
+    marginTop: 22,
   },
   botaoDesabilitado: { backgroundColor: '#A5C0FB' },
   botaoTexto: { color: '#FFFFFF', fontSize: 16, fontWeight: '600' },
+
+  // Modal dos termos
+  modal: { flex: 1, backgroundColor: '#FFFFFF' },
+  modalTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 48,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E9ECEF',
+  },
+  modalTitulo: { fontSize: 20, fontWeight: 'bold', color: '#212529' },
+  modalCorpo: { padding: 20 },
+  modalIntro: { fontSize: 14, color: '#868E96', marginBottom: 18, lineHeight: 20 },
+  secaoTitulo: { fontSize: 15, fontWeight: '700', color: '#212529', marginBottom: 4 },
+  secaoTexto: { fontSize: 14, color: '#495057', lineHeight: 21 },
+  modalRodape: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E9ECEF',
+    backgroundColor: '#FFFFFF',
+  },
+  botaoFechar: { alignItems: 'center', paddingVertical: 14 },
+  botaoFecharTexto: { color: '#868E96', fontSize: 15, fontWeight: '600' },
 });

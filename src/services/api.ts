@@ -11,6 +11,7 @@ export const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
 // Interceptor: Adiciona o Token JWT em todas as requisições autenticadas
 api.interceptors.request.use(
   async (config) => {

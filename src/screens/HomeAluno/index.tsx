@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { SecaoIngressarSala } from '../../components/SecaoIngressarSala';
 import { api } from '../../services/api';
 import { salaService } from '../../services/sala';
@@ -32,8 +33,9 @@ export function HomeAluno() {
   const [nomeUsuario, setNomeUsuario] = useState('');
   const [streak, setStreak] = useState(0);
   const [xp, setXp] = useState(0);
+  const [cardsHoje, setCardsHoje] = useState(0);
+  const [metaDiaria, setMetaDiaria] = useState(5);
   const [salas, setSalas] = useState<SalaAluno[]>([]);
-  const [salaEstudo, setSalaEstudo] = useState<SalaAluno | null>(null);
 
   // Somente as salas em que o aluno logado está vinculado (GET /salas/minhas)
   const carregarSalas = useCallback(async () => {
@@ -53,8 +55,10 @@ export function HomeAluno() {
     try {
       const response = await api.get('/usuarios/me');
       setNomeUsuario(response.data.nome || 'Aluno');
-      setStreak(response.data.ofensiva || response.data.streak || 0);
-      setXp(response.data.xp || 0);
+      setStreak(response.data.ofensiva ?? 0);
+      setXp(response.data.xp ?? 0);
+      setCardsHoje(response.data.cardsHoje ?? 0);
+      setMetaDiaria(response.data.metaDiaria ?? 5);
     } catch (error: any) {
       console.log('Erro ao carregar dados do aluno:', error);
       Alert.alert(
@@ -65,13 +69,13 @@ export function HomeAluno() {
     await carregarSalas();
   }, [carregarSalas]);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      await carregarTudo();
-      setLoading(false);
-    })();
-  }, [carregarTudo]);
+  // Recarrega toda vez que o aluno volta para esta aba
+  // (ex.: depois de estudar, o streak e o XP aparecem atualizados)
+  useFocusEffect(
+    useCallback(() => {
+      carregarTudo().finally(() => setLoading(false));
+    }, [carregarTudo])
+  );
 
   const aoPuxarParaAtualizar = async () => {
     setAtualizando(true);
@@ -79,11 +83,9 @@ export function HomeAluno() {
     setAtualizando(false);
   };
 
-  // Fecha a sessão e atualiza XP e ofensiva
-  const fecharEstudo = () => {
-    setSalaEstudo(null);
-    carregarTudo();
-  };
+  const metaCumprida = cardsHoje >= metaDiaria;
+  const faltam = Math.max(metaDiaria - cardsHoje, 0);
+  const progresso = Math.min(cardsHoje / metaDiaria, 1);
 
   if (loading) {
     return (
@@ -91,11 +93,6 @@ export function HomeAluno() {
         <ActivityIndicator size="large" color="#155DFC" />
       </View>
     );
-  }
-
-  // Sessão de flashcards da sala escolhida
-  if (salaEstudo) {
-    return <SessaoFlashcards sala={salaEstudo} onFechar={fecharEstudo} />;
   }
 
   return (
@@ -116,12 +113,53 @@ export function HomeAluno() {
           </View>
 
           <View style={styles.streakContainer}>
-            <MaterialCommunityIcons name="fire" size={32} color="#FF6B00" />
+            <MaterialCommunityIcons
+              name="fire"
+              size={32}
+              color={streak > 0 ? '#FF6B00' : '#ADB5BD'}
+            />
             <View>
               <Text style={styles.streakText}>{streak}</Text>
-              <Text style={styles.streakSubtext}>Dias</Text>
+              <Text style={styles.streakSubtext}>{streak === 1 ? 'Dia' : 'Dias'}</Text>
             </View>
           </View>
+        </View>
+
+        {/* Meta diária: mostra o que falta para manter/aumentar a ofensiva */}
+        <View style={[local.meta, metaCumprida && local.metaOk]}>
+          <View style={local.metaTopo}>
+            <MaterialCommunityIcons
+              name={metaCumprida ? 'check-decagram' : 'target'}
+              size={22}
+              color={metaCumprida ? '#2F9E44' : '#E8590C'}
+            />
+            <Text style={[local.metaTitulo, metaCumprida && { color: '#2F9E44' }]}>
+              {metaCumprida ? 'Meta de hoje cumprida!' : 'Meta de hoje'}
+            </Text>
+            <Text style={local.metaContagem}>
+              {Math.min(cardsHoje, metaDiaria)}/{metaDiaria}
+            </Text>
+          </View>
+
+          <View style={local.barra}>
+            <View
+              style={[
+                local.barraCheia,
+                { width: `${progresso * 100}%` },
+                metaCumprida && { backgroundColor: '#2F9E44' },
+              ]}
+            />
+          </View>
+
+          <Text style={local.metaTexto}>
+            {metaCumprida
+              ? streak > 0
+                ? `Sua ofensiva de ${streak} ${streak === 1 ? 'dia está' : 'dias está'} garantida. Volte amanhã!`
+                : 'Ótimo trabalho! Volte amanhã para continuar.'
+              : streak > 0
+                ? `Revise mais ${faltam} ${faltam === 1 ? 'card' : 'cards'} hoje para manter sua ofensiva de ${streak} ${streak === 1 ? 'dia' : 'dias'}.`
+                : `Revise ${faltam} ${faltam === 1 ? 'card' : 'cards'} hoje para começar sua ofensiva.`}
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Suas matérias</Text>
@@ -143,7 +181,7 @@ export function HomeAluno() {
               key={sala.id}
               activeOpacity={0.85}
               style={local.card}
-              onPress={() => setSalaEstudo(sala)}
+              onPress={() => console.log(`Abrir sala: ${sala.nome}`)}
             >
               <View style={[local.icone, { backgroundColor: CORES[index % CORES.length] }]}>
                 <MaterialCommunityIcons name="school" size={26} color="#FFFFFF" />
@@ -174,6 +212,28 @@ export function HomeAluno() {
 }
 
 const local = StyleSheet.create({
+  meta: {
+    backgroundColor: '#FFF4E6',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#FFD8A8',
+    padding: 14,
+    marginBottom: 18,
+  },
+  metaOk: { backgroundColor: '#EBFBEE', borderColor: '#B2F2BB' },
+  metaTopo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  metaTitulo: { flex: 1, fontSize: 15, fontWeight: 'bold', color: '#E8590C' },
+  metaContagem: { fontSize: 14, fontWeight: 'bold', color: '#495057' },
+  barra: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  barraCheia: { height: 8, borderRadius: 4, backgroundColor: '#FF922B' },
+  metaTexto: { fontSize: 13, color: '#495057', marginTop: 8, lineHeight: 18 },
+
   card: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,21 +6,46 @@ import {
   FlatList,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
   StyleSheet,
 } from 'react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { CompraInsigniaModal, InsigniaComprada } from '../../components/CompraInsigniaModal';
 import { InsigniaVisual, RaridadeInsignia } from '../../components/InsigniaVisual';
-import { InsigniaItem, LojaInsigniasScreenProps } from './types';
+import { insigniaService, InsigniaDTO, LojaInsigniasDTO } from '../../services/insignia';
+import { LojaInsigniasScreenProps } from './types';
 
 // Cada card estudado rende 10 XP (igual ao back-end)
 const XP_POR_CARD = 10;
-const ID_DESTAQUE = 'destaque';
 
-type Insignia = InsigniaItem & {
-  raridade: RaridadeInsignia;
+type Insignia = {
+  id: number;
+  titulo: string;
   frase: string;
+  precoXp: number;
+  iconName: string;
+  iconBgColor: string;
+  raridade: RaridadeInsignia;
+  destaque: boolean;
+  status: 'comprar' | 'equipar' | 'equipado';
 };
+
+// Converte o que vem do back-end para o formato usado na tela
+function converter(d: InsigniaDTO): Insignia {
+  return {
+    id: d.id,
+    titulo: d.titulo,
+    frase: d.frase,
+    precoXp: d.precoXp,
+    iconName: d.iconName,
+    iconBgColor: d.cor,
+    raridade: d.raridade,
+    destaque: d.destaque,
+    status: d.status,
+  };
+}
 
 const RARIDADES = {
   comum: { label: 'COMUM', cor: '#868E96' },
@@ -42,85 +67,53 @@ function Progresso({ atual, total, cor }: { atual: number; total: number; cor: s
   );
 }
 
-export function LojaInsignias({
-  usuarioXp = 850,
-  onGoBack,
-}: LojaInsigniasScreenProps) {
-  const [xp, setXp] = useState(usuarioXp);
+export function LojaInsignias({ onGoBack }: LojaInsigniasScreenProps) {
+  const [xp, setXp] = useState(0);
+  const [insignias, setInsignias] = useState<Insignia[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
+  const [processando, setProcessando] = useState(false);
   const [insigniaNova, setInsigniaNova] = useState<InsigniaComprada | null>(null);
-  const [idRecemComprada, setIdRecemComprada] = useState<string | null>(null);
+  const [idRecemComprada, setIdRecemComprada] = useState<number | null>(null);
 
-  const [insignias, setInsignias] = useState<Insignia[]>([
-    {
-      id: '1',
-      titulo: 'Primeira Vitória',
-      precoXp: 100,
-      status: 'equipar',
-      iconName: 'award',
-      iconBgColor: '#51CF66',
-      raridade: 'comum',
-      frase: 'O primeiro passo de todo mestre.',
-    },
-    {
-      id: '2',
-      titulo: 'Escudo do Saber',
-      precoXp: 400,
-      status: 'comprar',
-      iconName: 'shield',
-      iconBgColor: '#20C997',
-      raridade: 'rara',
-      frase: 'Defenda sua memória contra o esquecimento.',
-    },
-    {
-      id: '3',
-      titulo: 'Memória Foguete',
-      precoXp: 500,
-      status: 'comprar',
-      iconName: 'zap',
-      iconBgColor: '#FF6B6B',
-      raridade: 'epica',
-      frase: 'Decore na velocidade da luz.',
-    },
-    {
-      id: '4',
-      titulo: 'Chama Imparável',
-      precoXp: 750,
-      status: 'comprar',
-      iconName: 'trending-up',
-      iconBgColor: '#FD7E14',
-      raridade: 'epica',
-      frase: 'Quem estuda todo dia, brilha todo dia.',
-    },
-    {
-      id: '5',
-      titulo: 'Memória Brilhante',
-      precoXp: 1000,
-      status: 'comprar',
-      iconName: 'star',
-      iconBgColor: '#FCC419',
-      raridade: 'lendaria',
-      frase: 'Só os mais dedicados chegam aqui.',
-    },
-    {
-      id: ID_DESTAQUE,
-      titulo: 'Mestre da Memorização',
-      precoXp: 5000,
-      status: 'comprar',
-      iconName: 'sun',
-      iconBgColor: '#FCC419',
-      raridade: 'lendaria',
-      frase: 'Para os mestres da memorização! Edição limitada.',
-    },
-  ]);
+  const aplicar = (loja: LojaInsigniasDTO) => {
+    setXp(loja.xp);
+    setInsignias(loja.insignias.map(converter));
+  };
 
-  const destaque = insignias.find((i) => i.id === ID_DESTAQUE)!;
+  const carregar = useCallback(async () => {
+    try {
+      const loja = await insigniaService.carregarLoja();
+      setXp(loja.xp);
+      setInsignias(loja.insignias.map(converter));
+    } catch (error: any) {
+      Alert.alert(
+        'Erro',
+        error?.response?.data?.mensagem || 'Não foi possível carregar a loja de insígnias.'
+      );
+    } finally {
+      setCarregando(false);
+      setAtualizando(false);
+    }
+  }, []);
+
+  // Recarrega sempre que o aluno abre a aba (o XP muda quando ele estuda)
+  useFocusEffect(
+    useCallback(() => {
+      carregar();
+    }, [carregar])
+  );
+
+  const destaque = insignias.find((i) => i.destaque);
   const equipada = insignias.find((i) => i.status === 'equipado');
   const colecao = insignias.filter((i) => i.status !== 'comprar');
   const loja = insignias
-    .filter((i) => i.status === 'comprar' && i.id !== ID_DESTAQUE)
+    .filter((i) => i.status === 'comprar' && !i.destaque)
     .sort((a, b) => a.precoXp - b.precoXp);
 
-  const comprar = (item: Insignia) => {
+  const comprar = async (item: Insignia) => {
+    if (processando) return;
+
     if (xp < item.precoXp) {
       Alert.alert(
         'Quase lá!',
@@ -129,43 +122,66 @@ export function LojaInsignias({
       return;
     }
 
-    setXp((x) => x - item.precoXp);
-    setInsignias((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, status: 'equipar' } : i))
-    );
-    setIdRecemComprada(item.id);
-    setInsigniaNova({
-      nome: item.titulo,
-      descricao: item.frase,
-      icone: item.iconName as string,
-      raridade: item.raridade,
-      custo: item.precoXp,
-      cor: item.iconBgColor,
-    });
+    setProcessando(true);
+    try {
+      const resposta = await insigniaService.comprar(item.id);
+      aplicar(resposta);
+      setIdRecemComprada(item.id);
+      setInsigniaNova({
+        nome: item.titulo,
+        descricao: item.frase,
+        icone: item.iconName,
+        raridade: item.raridade,
+        custo: item.precoXp,
+        cor: item.iconBgColor,
+      });
+    } catch (error: any) {
+      Alert.alert(
+        'Não foi possível conquistar',
+        error?.response?.data?.mensagem || 'Tente novamente em instantes.'
+      );
+      carregar();
+    } finally {
+      setProcessando(false);
+    }
   };
 
   // Equipa a escolhida (e desequipa a anterior). Tocar na equipada desequipa.
-  const alternarEquipar = (id: string) => {
-    setInsignias((prev) =>
-      prev.map((i) => {
-        if (i.id === id) return { ...i, status: i.status === 'equipado' ? 'equipar' : 'equipado' };
-        return i.status === 'equipado' ? { ...i, status: 'equipar' } : i;
-      })
-    );
+  const alternarEquipar = async (id: number) => {
+    if (processando) return;
+
+    setProcessando(true);
+    try {
+      aplicar(await insigniaService.alternarEquipar(id));
+    } catch (error: any) {
+      Alert.alert(
+        'Erro',
+        error?.response?.data?.mensagem || 'Não foi possível equipar a insígnia.'
+      );
+    } finally {
+      setProcessando(false);
+    }
   };
 
-  const equiparRecemComprada = () => {
-    if (!idRecemComprada) return;
-    setInsignias((prev) =>
-      prev.map((i) => {
-        if (i.id === idRecemComprada) return { ...i, status: 'equipado' };
-        return i.status === 'equipado' ? { ...i, status: 'equipar' } : i;
-      })
-    );
+  const equiparRecemComprada = async () => {
+    if (idRecemComprada == null) return;
+
+    const atual = insignias.find((i) => i.id === idRecemComprada);
+    if (atual?.status === 'equipado') return;
+
+    await alternarEquipar(idRecemComprada);
   };
 
-  const destaqueDele = destaque.status !== 'comprar';
-  const faltaDestaque = destaque.precoXp - xp;
+  const destaqueDele = !!destaque && destaque.status !== 'comprar';
+  const faltaDestaque = destaque ? destaque.precoXp - xp : 0;
+
+  if (carregando) {
+    return (
+      <View style={[s.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#155DFC" />
+      </View>
+    );
+  }
 
   return (
     <View style={s.container}>
@@ -178,7 +194,19 @@ export function LojaInsignias({
         <View style={{ width: 28 }} />
       </View>
 
-      <ScrollView contentContainerStyle={s.conteudo} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={s.conteudo}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={atualizando}
+            onRefresh={() => {
+              setAtualizando(true);
+              carregar();
+            }}
+          />
+        }
+      >
         {/* Resumo: saldo + insígnia em destaque */}
         <View style={s.resumo}>
           <View style={{ flex: 1 }}>
@@ -219,6 +247,7 @@ export function LojaInsignias({
         </View>
 
         {/* ===== Vitrine lendária ===== */}
+        {destaque && (
         <View style={s.vitrine}>
           <View style={s.vitrineTag}>
             <Feather name="clock" size={12} color="#1B1F3B" />
@@ -270,6 +299,7 @@ export function LojaInsignias({
             </View>
           )}
         </View>
+        )}
 
         {/* ===== Minha coleção ===== */}
         <View style={s.secaoTitulo}>
@@ -293,7 +323,7 @@ export function LojaInsignias({
           <FlatList
             data={colecao}
             horizontal
-            keyExtractor={(i) => i.id}
+            keyExtractor={(i) => String(i.id)}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.colecaoLista}
             renderItem={({ item }) => {
